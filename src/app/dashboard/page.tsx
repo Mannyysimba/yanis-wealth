@@ -5,10 +5,12 @@ import { supabase } from "@/lib/supabase/client";
 import { useExchangeRates } from "@/hooks/use-exchange-rates";
 import { useTabs } from "@/hooks/use-tabs";
 import { convertToEur } from "@/lib/currency";
+import { formatEur, formatPercent } from "@/lib/format";
 import { SummaryCards } from "@/components/summary-cards";
 import { WealthChart } from "@/components/wealth-chart";
 import { AllocationChart } from "@/components/allocation-chart";
 import { CurrencyTable } from "@/components/currency-table";
+import { ObjectivesSection } from "@/components/objectives-section";
 import type { LineItem, DailySnapshot, BreakdownItem } from "@/types";
 
 export default function DashboardPage() {
@@ -25,7 +27,7 @@ export default function DashboardPage() {
         supabase
           .from("daily_snapshots")
           .select("*")
-          .order("date", { ascending: true }),
+          .order("snapshot_date", { ascending: true }),
       ]);
       if (itemsRes.data) setLineItems(itemsRes.data);
       if (snapshotsRes.data) setSnapshots(snapshotsRes.data);
@@ -36,7 +38,6 @@ export default function DashboardPage() {
 
   const loading = ratesLoading || tabsLoading || itemsLoading;
 
-  // Calculate totals by category
   const calculations = useMemo(() => {
     const allTabs = tabs.flatMap((t) =>
       t.children && t.children.length > 0 ? t.children : [t]
@@ -45,7 +46,6 @@ export default function DashboardPage() {
     let capitalTotal = 0;
     let investTotal = 0;
     const currencyAmounts: Record<string, number> = { EUR: 0, MAD: 0, AED: 0, USD: 0 };
-
     const categoryTotals: Record<string, number> = {
       Espèces: 0,
       Banque: 0,
@@ -62,24 +62,16 @@ export default function DashboardPage() {
       }
 
       const eurValue = convertToEur(rawSum, tab.currency, rates);
-
-      // Find parent tab name for category
-      const parent = tabs.find(
-        (p) => p.id === tab.parent_id || p.id === tab.id
-      );
+      const parent = tabs.find((p) => p.id === tab.parent_id || p.id === tab.id);
       const parentName = parent?.name || tab.name;
 
-      if (
-        parentName === "Tangem" ||
-        parentName === "Trust Wallet" ||
-        parentName === "Ledger"
-      ) {
+      if (["Tangem", "Trust Wallet", "Ledger", "Crypto"].includes(parentName)) {
         categoryTotals["Crypto"] += eurValue;
-      } else if (parentName === "Immobilier") {
+      } else if (parentName.includes("Immobilier") || parentName === "Immobilier") {
         categoryTotals["Immobilier"] += eurValue;
-      } else if (parentName === "Espèces") {
+      } else if (parentName.includes("Espèces") || parentName === "Espèces") {
         categoryTotals["Espèces"] += eurValue;
-      } else if (parentName === "Banque") {
+      } else if (parentName.includes("Banque") || parentName === "Banque") {
         categoryTotals["Banque"] += eurValue;
       }
 
@@ -92,7 +84,6 @@ export default function DashboardPage() {
 
     const totalPatrimoine = capitalTotal + investTotal;
 
-    // Variation from yesterday
     let variation24h = 0;
     let variationPercent = 0;
     if (snapshots.length > 0) {
@@ -129,13 +120,34 @@ export default function DashboardPage() {
     };
   }, [tabs, lineItems, rates, snapshots]);
 
+  const today = new Date().toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          Vue d&apos;ensemble de votre patrimoine
-        </p>
+    <div className="space-y-8">
+      {/* Hero Section */}
+      <div className="title-gradient rounded-2xl p-6 -mx-2 animate-fade-in">
+        <p className="text-sm text-muted-foreground capitalize">{today}</p>
+        <h1 className="text-2xl font-bold tracking-tight mt-1">Bonjour Patron 👑</h1>
+        {!loading && (
+          <div className="mt-3 flex items-baseline gap-3">
+            <span className="text-3xl font-bold tracking-tight font-mono lg:text-4xl">
+              {formatEur(calculations.totalPatrimoine)}
+            </span>
+            {calculations.variation24h !== 0 && (
+              <span className={`text-sm font-semibold ${
+                calculations.variation24h >= 0 ? "text-[var(--accent-green)]" : "text-[var(--accent-red)]"
+              }`}>
+                {calculations.variation24h >= 0 ? "+" : ""}{formatEur(calculations.variation24h)}
+                {" "}({formatPercent(calculations.variationPercent)}) depuis hier
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <SummaryCards
@@ -150,13 +162,23 @@ export default function DashboardPage() {
       <WealthChart snapshots={snapshots} loading={loading} />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <AllocationChart data={calculations.allocation} loading={loading} />
+        <AllocationChart
+          data={calculations.allocation}
+          loading={loading}
+          totalEur={calculations.totalPatrimoine}
+        />
         <CurrencyTable
           rows={calculations.currencyRows}
           loading={loading}
           lastUpdated={lastUpdated}
         />
       </div>
+
+      <ObjectivesSection
+        totalPatrimoine={calculations.totalPatrimoine}
+        snapshots={snapshots}
+        loading={loading}
+      />
     </div>
   );
 }

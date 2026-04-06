@@ -10,8 +10,6 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatEur } from "@/lib/format";
 import { TIME_RANGES } from "@/lib/constants";
@@ -38,40 +36,40 @@ export function WealthChart({ snapshots, loading }: WealthChartProps) {
       cutoff = new Date(now.getTime() - selected.days * 86400000);
     }
 
-    return snapshots.filter((s) => new Date(s.date) >= cutoff);
+    return snapshots.filter((s) => new Date(s.snapshot_date) >= cutoff);
   }, [snapshots, range]);
 
   const chartData = filtered.map((s) => ({
-    date: new Date(s.date).toLocaleDateString("fr-FR", {
+    date: new Date(s.snapshot_date).toLocaleDateString("fr-FR", {
       day: "2-digit",
       month: "2-digit",
     }),
-    fullDate: s.date,
     total: Number(s.total_eur),
-    breakdown: s.breakdown_json,
   }));
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium">Courbe de patrimoine</CardTitle>
+    <div className="card-gradient-border card-hover-glow rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between px-5 pt-5 pb-3">
+        <h3 className="text-sm font-semibold section-header">Courbe de patrimoine</h3>
         <div className="flex gap-1">
           {TIME_RANGES.map((r) => (
-            <Button
+            <button
               key={r.label}
-              variant={range === r.label ? "default" : "ghost"}
-              size="sm"
-              className="h-7 px-2.5 text-xs"
               onClick={() => setRange(r.label)}
+              className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-all duration-150 ${
+                range === r.label
+                  ? "bg-primary text-primary-foreground shadow-[0_0_12px_rgba(99,102,241,0.3)]"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+              }`}
             >
               {r.label}
-            </Button>
+            </button>
           ))}
         </div>
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div className="chart-bg-gradient px-2 pb-4">
         {loading ? (
-          <Skeleton className="h-[300px] w-full" />
+          <Skeleton className="h-[300px] w-full mx-3" />
         ) : chartData.length === 0 ? (
           <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
             Aucune donnée disponible
@@ -81,21 +79,20 @@ export function WealthChart({ snapshots, loading }: WealthChartProps) {
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="wealthGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366F1" stopOpacity={0.3} />
+                  <stop offset="5%" stopColor="#6366F1" stopOpacity={0.35} />
+                  <stop offset="50%" stopColor="#818CF8" stopOpacity={0.1} />
                   <stop offset="95%" stopColor="#6366F1" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,102,241,0.08)" />
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 11 }}
-                stroke="hsl(var(--muted-foreground))"
+                tick={{ fontSize: 10, fill: "#94A3B8" }}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
-                tick={{ fontSize: 11 }}
-                stroke="hsl(var(--muted-foreground))"
+                tick={{ fontSize: 10, fill: "#94A3B8" }}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(v: number) =>
@@ -107,10 +104,11 @@ export function WealthChart({ snapshots, loading }: WealthChartProps) {
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
+                  backgroundColor: "var(--bg-card)",
+                  border: "1px solid rgba(99,102,241,0.3)",
+                  borderRadius: "10px",
                   fontSize: "12px",
+                  boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
                 }}
                 formatter={(value) => [formatEur(Number(value)), "Total"]}
                 labelFormatter={(label) => `Date: ${String(label)}`}
@@ -119,13 +117,14 @@ export function WealthChart({ snapshots, loading }: WealthChartProps) {
                 type="monotone"
                 dataKey="total"
                 stroke="#6366F1"
-                strokeWidth={2}
+                strokeWidth={2.5}
                 fill="url(#wealthGrad)"
+                animationDuration={1500}
               />
             </AreaChart>
           </ResponsiveContainer>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

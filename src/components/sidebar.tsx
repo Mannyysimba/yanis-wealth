@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./theme-toggle";
@@ -24,21 +25,22 @@ export function Sidebar({ tabs, loading }: SidebarProps) {
   const investTabs = tabs.filter((t) => t.section === "investissement");
 
   return (
-    <aside className="hidden md:flex md:w-64 md:flex-col md:border-r border-border bg-card h-screen sticky top-0">
-      <div className="flex items-center gap-2 px-6 py-5 border-b border-border">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">
-          YW
-        </div>
-        <span className="text-lg font-semibold tracking-tight">Yanis Wealth</span>
+    <aside className="hidden md:flex md:w-64 md:flex-col border-r border-[rgba(99,102,241,0.12)] bg-[var(--bg-secondary)] h-screen sticky top-0">
+      {/* Gradient right border */}
+      <div className="absolute right-0 top-0 bottom-0 w-px bg-gradient-to-b from-[#6366F1]/40 via-[#A78BFA]/20 to-transparent" />
+
+      <div className="flex items-center gap-3 px-5 py-5 border-b border-[rgba(99,102,241,0.12)]">
+        <Image src="/logo.svg" alt="YW" width={36} height={36} className="rounded-lg" />
+        <span className="text-base font-semibold tracking-tight">Yanis Wealth</span>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
         <Link
           href="/dashboard"
           className={cn(
-            "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+            "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150",
             pathname === "/dashboard"
-              ? "bg-primary/10 text-primary"
+              ? "bg-primary/15 text-primary shadow-[0_0_12px_rgba(99,102,241,0.2)]"
               : "text-muted-foreground hover:text-foreground hover:bg-accent"
           )}
         >
@@ -51,7 +53,7 @@ export function Sidebar({ tabs, loading }: SidebarProps) {
         {loading ? (
           <div className="space-y-2 px-3">
             {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-8 w-full" />
+              <Skeleton key={i} className="h-7 w-full" />
             ))}
           </div>
         ) : (
@@ -60,8 +62,8 @@ export function Sidebar({ tabs, loading }: SidebarProps) {
               { key: "capital", items: capitalTabs },
               { key: "investissement", items: investTabs },
             ].map(({ key, items }) => (
-              <div key={key} className="space-y-1">
-                <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div key={key} className="space-y-0.5">
+                <p className="section-header mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
                   {sectionLabels[key]}
                 </p>
                 {items.map((tab) => {
@@ -69,17 +71,17 @@ export function Sidebar({ tabs, loading }: SidebarProps) {
                   if (hasChildren) {
                     return (
                       <div key={tab.id} className="space-y-0.5">
-                        <p className="px-3 py-1.5 text-sm font-medium text-foreground/80">
+                        <p className="px-3 py-1 text-xs font-semibold text-foreground/70">
                           {tab.name}
                         </p>
                         {tab.children!.map((child) => (
                           <Link
                             key={child.id}
-                            href={`/dashboard/${key}/${child.id}`}
+                            href={`/dashboard/${key}/${child.slug}`}
                             className={cn(
-                              "flex items-center rounded-lg px-3 py-1.5 pl-7 text-sm transition-colors",
-                              pathname === `/dashboard/${key}/${child.id}`
-                                ? "bg-primary/10 text-primary"
+                              "flex items-center rounded-lg px-3 py-1.5 pl-7 text-sm transition-all duration-150",
+                              pathname === `/dashboard/${key}/${child.slug}`
+                                ? "bg-primary/15 text-primary shadow-[0_0_12px_rgba(99,102,241,0.15)]"
                                 : "text-muted-foreground hover:text-foreground hover:bg-accent"
                             )}
                           >
@@ -92,11 +94,11 @@ export function Sidebar({ tabs, loading }: SidebarProps) {
                   return (
                     <Link
                       key={tab.id}
-                      href={`/dashboard/${key}/${tab.id}`}
+                      href={`/dashboard/${key}/${tab.slug}`}
                       className={cn(
-                        "flex items-center rounded-lg px-3 py-1.5 text-sm transition-colors",
-                        pathname === `/dashboard/${key}/${tab.id}`
-                          ? "bg-primary/10 text-primary"
+                        "flex items-center rounded-lg px-3 py-1.5 text-sm transition-all duration-150",
+                        pathname === `/dashboard/${key}/${tab.slug}`
+                          ? "bg-primary/15 text-primary shadow-[0_0_12px_rgba(99,102,241,0.15)]"
                           : "text-muted-foreground hover:text-foreground hover:bg-accent"
                       )}
                     >
@@ -110,13 +112,13 @@ export function Sidebar({ tabs, loading }: SidebarProps) {
         )}
       </nav>
 
-      <div className="border-t border-border px-3 py-3 flex items-center justify-between">
+      <div className="border-t border-[rgba(99,102,241,0.12)] px-3 py-3 flex items-center justify-between">
         <Link
           href="/dashboard/settings"
           className={cn(
-            "flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors",
+            "flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-all duration-150",
             pathname === "/dashboard/settings"
-              ? "bg-primary/10 text-primary"
+              ? "bg-primary/15 text-primary"
               : "text-muted-foreground hover:text-foreground hover:bg-accent"
           )}
         >

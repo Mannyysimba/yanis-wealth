@@ -16,10 +16,10 @@ export function useTabs() {
 
     if (error) {
       console.error("Error fetching tabs:", error);
+      setLoading(false);
       return;
     }
 
-    // Build tree
     const parents = (data || []).filter((t) => !t.parent_id);
     const tree = parents.map((parent) => ({
       ...parent,

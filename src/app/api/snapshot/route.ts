@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { FALLBACK_RATES } from "@/lib/constants";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 function convertToEur(amount: number, currency: string, rates: Record<string, number>): number {
   if (currency === "EUR") return amount;
@@ -16,24 +16,17 @@ export async function POST() {
   try {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch exchange rates
     let rates: Record<string, number> = FALLBACK_RATES;
     try {
       const rateRes = await fetch("https://api.exchangerate-api.com/v4/latest/EUR");
       if (rateRes.ok) {
         const rateData = await rateRes.json();
-        rates = {
-          EUR: 1,
-          MAD: rateData.rates.MAD,
-          AED: rateData.rates.AED,
-          USD: rateData.rates.USD,
-        };
+        rates = { EUR: 1, MAD: rateData.rates.MAD, AED: rateData.rates.AED, USD: rateData.rates.USD };
       }
     } catch {
-      // Use fallback rates
+      // use fallback
     }
 
-    // Fetch all tabs and line items
     const { data: allTabs } = await supabase.from("tabs").select("*");
     const { data: allItems } = await supabase.from("line_items").select("*");
 
@@ -43,6 +36,8 @@ export async function POST() {
 
     const breakdown: Record<string, number> = {};
     let total = 0;
+    let capTotal = 0;
+    let invTotal = 0;
 
     for (const tab of allTabs) {
       const tabItems = allItems.filter((li) => li.tab_id === tab.id);
@@ -50,25 +45,28 @@ export async function POST() {
       const eurValue = convertToEur(rawSum, tab.currency, rates);
       breakdown[tab.name] = eurValue;
       total += eurValue;
+      if (tab.section === "capital") capTotal += eurValue;
+      else invTotal += eurValue;
     }
 
     const today = new Date().toISOString().split("T")[0];
 
     const { error } = await supabase.from("daily_snapshots").upsert(
       {
-        date: today,
+        snapshot_date: today,
         total_eur: total,
+        capital_eur: capTotal,
+        investissement_eur: invTotal,
         breakdown_json: breakdown,
         rates_used: rates,
       },
-      { onConflict: "date" }
+      { onConflict: "snapshot_date" }
     );
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Cache rates
     await supabase.from("exchange_rates").insert({
       base: "EUR",
       rates,

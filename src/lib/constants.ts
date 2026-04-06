@@ -15,17 +15,12 @@ export const FALLBACK_RATES: Record<string, number> = {
 
 export const CURRENCY_SYMBOLS: Record<string, string> = {
   EUR: '€',
-  MAD: 'MAD',
-  AED: 'AED',
+  MAD: 'د.م.',
+  AED: 'د.إ',
   USD: '$',
 };
 
-export const ALLOCATION_COLORS: Record<string, string> = {
-  'Espèces': '#6366F1',
-  'Banque': '#818CF8',
-  'Crypto': '#4F46E5',
-  'Immobilier': '#A78BFA',
-};
+export const CHART_COLORS = ['#6366F1', '#818CF8', '#A78BFA', '#F59E0B', '#10B981', '#3B82F6'];
 
 export const TIME_RANGES = [
   { label: '7J', days: 7 },

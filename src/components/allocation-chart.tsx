@@ -1,63 +1,73 @@
 "use client";
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatEur } from "@/lib/format";
+import { CHART_COLORS } from "@/lib/constants";
 import type { BreakdownItem } from "@/types";
 
 interface AllocationChartProps {
   data: BreakdownItem[];
   loading: boolean;
+  totalEur: number;
 }
 
-const COLORS = ["#6366F1", "#818CF8", "#4F46E5", "#A78BFA", "#7C3AED", "#6D28D9"];
-
-export function AllocationChart({ data, loading }: AllocationChartProps) {
-  const total = data.reduce((sum, d) => sum + d.value, 0);
-
+export function AllocationChart({ data, loading, totalEur }: AllocationChartProps) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium">Répartition du patrimoine</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <div className="card-gradient-border card-hover-glow rounded-xl">
+      <div className="px-5 pt-5 pb-2">
+        <h3 className="text-sm font-semibold section-header">Répartition du patrimoine</h3>
+      </div>
+      <div className="px-4 pb-4">
         {loading ? (
-          <Skeleton className="h-[300px] w-full" />
-        ) : data.length === 0 || total === 0 ? (
-          <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
+          <Skeleton className="h-[280px] w-full" />
+        ) : data.length === 0 || totalEur === 0 ? (
+          <div className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">
             Aucune donnée disponible
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={280}>
             <PieChart>
               <Pie
                 data={data}
                 cx="50%"
-                cy="50%"
-                innerRadius={70}
-                outerRadius={110}
+                cy="45%"
+                innerRadius={65}
+                outerRadius={100}
                 dataKey="value"
                 nameKey="name"
                 strokeWidth={2}
-                stroke="hsl(var(--background))"
+                stroke="var(--bg-primary)"
+                animationDuration={1200}
               >
                 {data.map((_, index) => (
                   <Cell
                     key={`cell-${index}`}
-                    fill={COLORS[index % COLORS.length]}
+                    fill={CHART_COLORS[index % CHART_COLORS.length]}
                   />
                 ))}
               </Pie>
+              {/* Center text */}
+              <text
+                x="50%"
+                y="43%"
+                textAnchor="middle"
+                dominantBaseline="central"
+                className="fill-foreground text-lg font-bold"
+                style={{ fontSize: '16px', fontWeight: 700 }}
+              >
+                {formatEur(totalEur)}
+              </text>
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
+                  backgroundColor: "var(--bg-card)",
+                  border: "1px solid rgba(99,102,241,0.3)",
+                  borderRadius: "10px",
                   fontSize: "12px",
+                  boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
                 }}
                 formatter={(value) => [
-                  `${formatEur(Number(value))} (${((Number(value) / total) * 100).toFixed(1)}%)`,
+                  `${formatEur(Number(value))} (${((Number(value) / totalEur) * 100).toFixed(1)}%)`,
                 ]}
               />
               <Legend
@@ -66,14 +76,14 @@ export function AllocationChart({ data, loading }: AllocationChartProps) {
                   const name = String(value);
                   const item = data.find((d) => d.name === name);
                   if (!item) return name;
-                  return `${name} — ${formatEur(item.value)} (${((item.value / total) * 100).toFixed(1)}%)`;
+                  return `${name} — ${formatEur(item.value)} (${((item.value / totalEur) * 100).toFixed(1)}%)`;
                 }}
-                wrapperStyle={{ fontSize: "12px" }}
+                wrapperStyle={{ fontSize: "11px" }}
               />
             </PieChart>
           </ResponsiveContainer>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

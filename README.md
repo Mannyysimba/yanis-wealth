@@ -1,76 +1,94 @@
 # Yanis Wealth
 
-Personal wealth dashboard built with Next.js 14, Supabase, and Tailwind CSS.
+Premium personal wealth dashboard — track assets across currencies, set financial goals, and visualize wealth growth.
 
 ## Features
 
-- Multi-currency wealth tracking (EUR, MAD, AED, USD)
-- Live exchange rate conversion
-- Daily wealth snapshots with historical charts
-- Asset allocation visualization
-- Dynamic tabs/categories management
-- Dark/Light mode
-- PWA support (iPhone home screen)
+- Multi-currency wealth tracking (EUR, MAD, AED, USD) with live conversion
+- Daily automated snapshots at 20:00 Paris time (pg_cron)
+- Interactive wealth curve and allocation charts (Recharts)
+- Financial objectives with progress tracking and motivational phrases
+- Dynamic tabs — add/rename/delete categories from Settings
+- Dark/Light mode with premium gradient design system
+- PWA — installable on iPhone home screen
+- Auto-save on blur + manual save
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14 (App Router) + TypeScript
-- **Styling**: Tailwind CSS + shadcn/ui
-- **Database**: Supabase (PostgreSQL)
-- **Charts**: Recharts
-- **Auth**: Supabase Auth
-- **Deployment**: Vercel
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 14 (App Router) + TypeScript |
+| Styling | Tailwind CSS + shadcn/ui + Sora font |
+| Database | Supabase (PostgreSQL) |
+| Auth | Supabase Auth (email/password) |
+| Charts | Recharts |
+| Deployment | Vercel |
 
 ## Getting Started
 
-### Prerequisites
+### 1. Clone & Install
 
-- Node.js 18+
-- A Supabase project
+```bash
+git clone https://github.com/Mannyysimba/yanis-wealth.git
+cd yanis-wealth
+npm install
+```
 
-### Setup
+### 2. Environment Variables
 
-1. Clone the repo:
-   ```bash
-   git clone https://github.com/your-username/yanis-wealth.git
-   cd yanis-wealth
-   ```
+```bash
+cp .env.example .env.local
+```
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Copy environment variables:
-   ```bash
-   cp .env.example .env.local
-   ```
-
-4. Fill in your Supabase credentials in `.env.local`:
-   ```
-   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-   ```
-
-5. Run the database migrations in your Supabase SQL editor (see `supabase/migrations/`).
-
-6. Create a user in Supabase Auth dashboard.
-
-7. Start the dev server:
-   ```bash
-   npm run dev
-   ```
-
-## Deploy to Vercel
-
-1. Push to GitHub
-2. Import the repo in [Vercel](https://vercel.com)
-3. Add environment variables in Vercel dashboard
-4. Deploy
-
-## Environment Variables
+Fill in:
 
 | Variable | Description |
 |----------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anon/public key |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (for API routes) |
+| `NEXT_PUBLIC_APP_URL` | App URL (http://localhost:3000 for dev) |
+
+### 3. Database Setup
+
+Copy the SQL from `supabase/migrations/001_initial.sql` into Supabase SQL Editor and run it.
+
+### 4. Create Auth User
+
+Go to Supabase Dashboard → Authentication → Users → Add User with Yanis's email and password.
+
+### 5. Run Dev Server
+
+```bash
+npm run dev
+```
+
+## Deploy to Vercel
+
+```bash
+# Push to GitHub (already done)
+git push origin main
+
+# Then import at vercel.com/new
+# Add all 4 env vars in Vercel dashboard
+# Deploy!
+```
+
+## APIs & Services Required
+
+| Service | URL | Cost | Used for |
+|---------|-----|------|----------|
+| Supabase | supabase.com | Free | Database, Auth, Edge Functions |
+| ExchangeRate API | exchangerate-api.com | Free | Live currency conversion |
+| Vercel | vercel.com | Free | Hosting & deployment |
+| Google Fonts | fonts.google.com | Free | Sora font |
+
+No paid API keys required.
+
+## PWA Checklist
+
+- [x] `manifest.json` with app name, icons, theme
+- [x] Service worker for offline caching
+- [x] Apple meta tags for iOS
+- [x] Standalone display mode
+- [x] 192x192 and 512x512 PNG icons

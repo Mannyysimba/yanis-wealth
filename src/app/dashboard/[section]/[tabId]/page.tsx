@@ -16,10 +16,11 @@ export default function TabPage({
 
   useEffect(() => {
     async function fetchTab() {
+      // Find tab by slug
       const { data, error } = await supabase
         .from("tabs")
         .select("*")
-        .eq("id", params.tabId)
+        .eq("slug", params.tabId)
         .single();
 
       if (!error && data) {
@@ -32,7 +33,7 @@ export default function TabPage({
 
   if (loading) {
     return (
-      <div className="space-y-4 animate-fade-in">
+      <div className="max-w-2xl space-y-4 animate-fade-in">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-64 w-full" />
       </div>
@@ -42,8 +43,8 @@ export default function TabPage({
   if (!tab) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <p className="text-lg font-medium">Onglet introuvable</p>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-lg font-semibold">Onglet introuvable</p>
+        <p className="text-sm text-muted-foreground mt-1">
           Cet onglet n&apos;existe pas ou a été supprimé.
         </p>
       </div>

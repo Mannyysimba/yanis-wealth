@@ -5,10 +5,9 @@ import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CURRENCY_SYMBOLS } from "@/lib/constants";
-import { formatDateTime } from "@/lib/format";
+import { timeAgo } from "@/lib/format";
 import type { LineItem, Tab } from "@/types";
 
 interface LineItemFormProps {
@@ -29,7 +28,7 @@ export function LineItemForm({ tab }: LineItemFormProps) {
       .from("line_items")
       .select("*")
       .eq("tab_id", tab.id)
-      .order("updated_at", { ascending: true });
+      .order("position", { ascending: true });
 
     if (!error && data) {
       setItems(data);
@@ -54,7 +53,18 @@ export function LineItemForm({ tab }: LineItemFormProps) {
     );
   };
 
-  const handleSave = async () => {
+  const handleBlurSave = async (id: string) => {
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
+    const now = new Date().toISOString();
+    await supabase
+      .from("line_items")
+      .update({ amount: item.amount, updated_at: now })
+      .eq("id", id);
+    setLastModified(now);
+  };
+
+  const handleSaveAll = async () => {
     setSaving(true);
     const now = new Date().toISOString();
     for (const item of items) {
@@ -69,6 +79,7 @@ export function LineItemForm({ tab }: LineItemFormProps) {
 
   const handleAdd = async () => {
     if (!newLabel.trim()) return;
+    const maxPos = items.reduce((max, i) => Math.max(max, i.position), -1);
     const { data, error } = await supabase
       .from("line_items")
       .insert({
@@ -76,6 +87,7 @@ export function LineItemForm({ tab }: LineItemFormProps) {
         label: newLabel.trim(),
         amount: 0,
         currency: tab.currency,
+        position: maxPos + 1,
       })
       .select()
       .single();
@@ -93,10 +105,7 @@ export function LineItemForm({ tab }: LineItemFormProps) {
 
   const handleRename = async (id: string) => {
     if (!editLabel.trim()) return;
-    await supabase
-      .from("line_items")
-      .update({ label: editLabel.trim() })
-      .eq("id", id);
+    await supabase.from("line_items").update({ label: editLabel.trim() }).eq("id", id);
     setItems((prev) =>
       prev.map((item) =>
         item.id === id ? { ...item, label: editLabel.trim() } : item
@@ -109,39 +118,40 @@ export function LineItemForm({ tab }: LineItemFormProps) {
   const symbol = CURRENCY_SYMBOLS[tab.currency] || tab.currency;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+    <div className="card-gradient-border rounded-xl">
+      <div className="flex items-center justify-between px-5 pt-5 pb-3">
         <div>
-          <CardTitle className="text-lg">{tab.name}</CardTitle>
+          <h2 className="text-lg font-semibold">{tab.name}</h2>
           {lastModified && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Dernière modification : {formatDateTime(lastModified)}
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Dernière mise à jour : {timeAgo(lastModified)}
             </p>
           )}
         </div>
-        <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+        <span className="rounded-md bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary">
           {tab.currency}
         </span>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      </div>
+      <div className="px-5 pb-5 space-y-4">
         {loading ? (
           <div className="space-y-3">
             {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full" />
+              <Skeleton key={i} className="h-14 w-full" />
             ))}
           </div>
         ) : (
           <>
             {items.length === 0 && (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                Aucune valeur. Cliquez ci-dessous pour ajouter.
-              </p>
+              <div className="py-10 text-center">
+                <p className="text-sm text-muted-foreground">Aucune valeur</p>
+                <p className="text-xs text-muted-foreground mt-1">Cliquez ci-dessous pour ajouter une ligne</p>
+              </div>
             )}
             {items.map((item) => (
               <div key={item.id} className="flex items-end gap-3">
                 <div className="flex-1">
                   {editingId === item.id ? (
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 mb-1">
                       <Input
                         value={editLabel}
                         onChange={(e) => setEditLabel(e.target.value)}
@@ -149,21 +159,16 @@ export function LineItemForm({ tab }: LineItemFormProps) {
                           if (e.key === "Enter") handleRename(item.id);
                           if (e.key === "Escape") setEditingId(null);
                         }}
-                        className="h-8 text-sm"
+                        className="h-7 text-xs"
                         autoFocus
                       />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8"
-                        onClick={() => handleRename(item.id)}
-                      >
+                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handleRename(item.id)}>
                         OK
                       </Button>
                     </div>
                   ) : (
                     <Label
-                      className="text-sm cursor-pointer hover:text-primary transition-colors"
+                      className="text-xs font-medium text-muted-foreground cursor-pointer hover:text-primary transition-colors"
                       onDoubleClick={() => {
                         setEditingId(item.id);
                         setEditLabel(item.label);
@@ -178,10 +183,11 @@ export function LineItemForm({ tab }: LineItemFormProps) {
                       inputMode="decimal"
                       value={item.amount === 0 ? "" : item.amount.toString()}
                       onChange={(e) => handleAmountChange(item.id, e.target.value)}
+                      onBlur={() => handleBlurSave(item.id)}
                       placeholder="0,00"
-                      className="pr-12 font-mono"
+                      className="pr-14 font-mono text-base"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
                       {symbol}
                     </span>
                   </div>
@@ -189,7 +195,7 @@ export function LineItemForm({ tab }: LineItemFormProps) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                  className="h-9 w-9 text-muted-foreground hover:text-destructive shrink-0"
                   onClick={() => handleDelete(item.id)}
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -199,11 +205,11 @@ export function LineItemForm({ tab }: LineItemFormProps) {
               </div>
             ))}
 
-            <div className="flex gap-2 pt-2 border-t border-border">
+            <div className="flex gap-2 pt-3 border-t border-[rgba(99,102,241,0.1)]">
               <Input
                 value={newLabel}
                 onChange={(e) => setNewLabel(e.target.value)}
-                placeholder="Nouveau champ..."
+                placeholder="Ajouter une ligne..."
                 className="text-sm"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleAdd();
@@ -214,16 +220,12 @@ export function LineItemForm({ tab }: LineItemFormProps) {
               </Button>
             </div>
 
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              className="w-full"
-            >
-              {saving ? "Enregistrement..." : "Enregistrer"}
+            <Button onClick={handleSaveAll} disabled={saving} className="w-full">
+              {saving ? "Enregistrement..." : "Sauvegarder"}
             </Button>
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

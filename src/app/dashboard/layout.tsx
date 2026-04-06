@@ -37,8 +37,8 @@ export default function DashboardLayout({
 
   if (!authChecked) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold animate-pulse">
+      <div className="flex min-h-screen items-center justify-center bg-[#070810]">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground text-sm font-bold animate-pulse">
           YW
         </div>
       </div>
@@ -48,7 +48,7 @@ export default function DashboardLayout({
   return (
     <>
       {showSplash && <WelcomeSplash onDone={handleSplashDone} />}
-      <div className="flex min-h-screen">
+      <div className="flex min-h-screen bg-gradient-radial">
         <Sidebar tabs={tabs} loading={loading} />
         <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
           <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
