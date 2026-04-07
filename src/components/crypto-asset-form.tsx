@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { fetchAllPrices, searchCoins, KNOWN_COINS, type AssetPrice, type CoinSearchResult } from "@/lib/prices";
 import { convertToEur } from "@/lib/currency";
 import { FALLBACK_RATES } from "@/lib/constants";
-import { timeAgo, formatCurrency, formatEur } from "@/lib/format";
+import { timeAgo, formatCurrency, formatEur, safeNumberFormat } from "@/lib/format";
 import { TabObjective } from "@/components/tab-objective";
 import type { LineItem, Tab } from "@/types";
 
@@ -51,6 +51,11 @@ function getCoinName(symbol: string): string {
   const known = KNOWN_COINS[symbol];
   if (known) return known.name;
   return symbol;
+}
+
+function formatPrice(price: number): string {
+  if (price >= 1000) return `$${safeNumberFormat(price, { maximumFractionDigits: 0 })}`;
+  return `$${price.toFixed(price < 1 ? 4 : 2)}`;
 }
 
 export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
@@ -288,7 +293,29 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
 
   return (
     <div className="card-gradient-border rounded-xl">
-      <div className="flex items-center justify-between px-5 pt-5 pb-3">
+      {/* Mobile header — single compact line */}
+      <div className="flex items-center gap-1.5 flex-wrap px-4 pt-4 pb-3 md:hidden" style={{ fontSize: 13 }}>
+        <span className="font-semibold">{tab.name}</span>
+        {lastPriceUpdate && !pricesLoading && (
+          <>
+            <span className="text-muted-foreground">&middot;</span>
+            <span className="inline-flex items-center gap-1 text-[var(--accent-green)]">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent-green)] opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[var(--accent-green)]" />
+              </span>
+              Live
+            </span>
+          </>
+        )}
+        <span className="text-muted-foreground">&middot;</span>
+        <span className="font-mono">{formatCurrency(totalUsd, "USD")}</span>
+        <span className="text-muted-foreground">=</span>
+        <span className="font-mono">{formatEur(totalEur)}</span>
+      </div>
+
+      {/* Desktop header — original two-line layout */}
+      <div className="hidden md:flex items-center justify-between px-5 pt-5 pb-3">
         <div>
           <h2 className="text-lg font-semibold">{tab.name}</h2>
           <div className="flex items-center gap-2 mt-0.5">
@@ -318,9 +345,9 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
         </div>
       </div>
 
-      <div className="px-5 pb-5 space-y-1">
-        {/* Header row */}
-        <div className="grid grid-cols-12 gap-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-1 pb-1">
+      <div className="px-4 pb-4 md:px-5 md:pb-5 space-y-0 md:space-y-1">
+        {/* Desktop table header — hidden on mobile */}
+        <div className="hidden md:grid grid-cols-12 gap-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-1 pb-1">
           <div className="col-span-3">Actif</div>
           <div className="col-span-2 text-right">Quantité</div>
           <div className="col-span-2 text-right">Prix/u $</div>
@@ -329,7 +356,7 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
           <div className="col-span-1" />
         </div>
 
-        {items.map((item) => {
+        {items.map((item, index) => {
           const price = getPrice(item.label);
           const qty = Number(item.amount);
           const rowTotalUsd = qty * price;
@@ -338,62 +365,103 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
           const hasLivePrice = price > 0;
 
           return (
-            <div
-              key={item.id}
-              className="grid grid-cols-12 gap-2 items-center rounded-lg px-1 py-2 hover:bg-accent/30 transition-colors"
-            >
-              <div className="col-span-3">
-                <p className="text-sm font-medium">{assetName}</p>
-                <p className="text-[10px] text-muted-foreground">{item.label}</p>
-              </div>
-
-              <div className="col-span-2">
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={rawInputs[item.id] ?? ""}
-                  onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                  onBlur={() => handleBlurSave(item.id)}
-                  placeholder="0"
-                  className="h-8 text-right font-mono text-sm"
-                />
-              </div>
-
-              <div className="col-span-2 text-right">
-                {pricesLoading ? (
-                  <Skeleton className="h-4 w-16 ml-auto" />
-                ) : hasLivePrice ? (
-                  <span className="font-mono text-sm">
-                    ${price >= 1000 ? price.toLocaleString("en-US", { maximumFractionDigits: 0 }) : price.toFixed(price < 1 ? 4 : 2)}
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-muted-foreground">—</span>
-                )}
-              </div>
-
-              <div className="col-span-2 text-right font-mono text-sm">
-                {qty > 0 && hasLivePrice ? (
-                  `$${rowTotalUsd.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                )}
-              </div>
-
-              <div className="col-span-2 text-right font-mono text-sm text-muted-foreground">
-                {qty > 0 && hasLivePrice ? formatEur(rowTotalEur) : "—"}
-              </div>
-
-              <div className="col-span-1 text-right">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+            <div key={item.id}>
+              {/* Mobile card layout */}
+              <div className="md:hidden relative px-4 py-3.5" style={{ marginLeft: -16, marginRight: -16 }}>
+                {/* Delete button — top right */}
+                <button
                   onClick={() => handleDelete(item.id)}
+                  className="absolute top-2.5 right-3 p-1 text-muted-foreground/50 hover:text-destructive transition-colors"
                 >
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
-                </Button>
+                </button>
+
+                {/* Row 1: Name + ticker | Price per unit */}
+                <div className="flex items-baseline justify-between pr-6">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-sm font-semibold">{assetName}</span>
+                    <span className="text-[11px] text-muted-foreground">{item.label}</span>
+                  </div>
+                  <span className="text-[12px] font-mono text-muted-foreground">
+                    {pricesLoading ? "..." : hasLivePrice ? formatPrice(price) : "—"}
+                  </span>
+                </div>
+
+                {/* Row 2: Quantity input | Total EUR */}
+                <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-muted-foreground">Qté:</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={rawInputs[item.id] ?? ""}
+                      onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                      onBlur={() => handleBlurSave(item.id)}
+                      placeholder="0"
+                      className="w-20 bg-transparent border-b border-muted-foreground/20 focus:border-primary text-sm font-mono outline-none py-0.5 text-center"
+                    />
+                  </div>
+                  <span className={`text-sm font-mono font-semibold ${qty > 0 && hasLivePrice ? "text-primary" : "text-muted-foreground"}`}>
+                    {qty > 0 && hasLivePrice ? formatEur(rowTotalEur) : "—"}
+                  </span>
+                </div>
+              </div>
+              {/* Separator between mobile cards */}
+              {index < items.length - 1 && (
+                <div className="md:hidden border-b border-[rgba(99,102,241,0.08)]" style={{ marginLeft: -16, marginRight: -16 }} />
+              )}
+
+              {/* Desktop table row — hidden on mobile */}
+              <div className="hidden md:grid grid-cols-12 gap-2 items-center rounded-lg px-1 py-2 hover:bg-accent/30 transition-colors">
+                <div className="col-span-3">
+                  <p className="text-sm font-medium">{assetName}</p>
+                  <p className="text-[10px] text-muted-foreground">{item.label}</p>
+                </div>
+
+                <div className="col-span-2">
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    value={rawInputs[item.id] ?? ""}
+                    onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                    onBlur={() => handleBlurSave(item.id)}
+                    placeholder="0"
+                    className="h-8 text-right font-mono text-sm"
+                  />
+                </div>
+
+                <div className="col-span-2 text-right">
+                  {pricesLoading ? (
+                    <Skeleton className="h-4 w-16 ml-auto" />
+                  ) : hasLivePrice ? (
+                    <span className="font-mono text-sm">{formatPrice(price)}</span>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground">—</span>
+                  )}
+                </div>
+
+                <div className="col-span-2 text-right font-mono text-sm">
+                  {qty > 0 && hasLivePrice ? `$${safeNumberFormat(rowTotalUsd, { maximumFractionDigits: 0 })}` : <span className="text-muted-foreground">—</span>}
+                </div>
+
+                <div className="col-span-2 text-right font-mono text-sm text-muted-foreground">
+                  {qty > 0 && hasLivePrice ? formatEur(rowTotalEur) : "—"}
+                </div>
+
+                <div className="col-span-1 text-right">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    onClick={() => handleDelete(item.id)}
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </Button>
+                </div>
               </div>
             </div>
           );

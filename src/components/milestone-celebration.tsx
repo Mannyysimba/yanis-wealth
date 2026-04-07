@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import confetti from "canvas-confetti";
 
 interface Milestone {
   amount: number;
@@ -72,28 +71,36 @@ export function MilestoneCelebration({
   }, [milestone.amount, onDone]);
 
   useEffect(() => {
-    // Fire confetti
-    const duration = 4000;
-    const end = Date.now() + duration;
+    // Fire confetti — dynamic import to avoid SSR/Safari iOS crash
+    let cancelled = false;
+    import("canvas-confetti").then((mod) => {
+      if (cancelled) return;
+      const confetti = mod.default;
+      const duration = 4000;
+      const end = Date.now() + duration;
 
-    const frame = () => {
-      confetti({
-        particleCount: 3,
-        angle: 60,
-        spread: 55,
-        origin: { x: 0, y: 0.7 },
-        colors: ["#6366F1", "#A78BFA", "#F59E0B"],
-      });
-      confetti({
-        particleCount: 3,
-        angle: 120,
-        spread: 55,
-        origin: { x: 1, y: 0.7 },
-        colors: ["#6366F1", "#A78BFA", "#F59E0B"],
-      });
-      if (Date.now() < end) requestAnimationFrame(frame);
-    };
-    frame();
+      const frame = () => {
+        if (cancelled) return;
+        confetti({
+          particleCount: 3,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0, y: 0.7 },
+          colors: ["#6366F1", "#A78BFA", "#F59E0B"],
+        });
+        confetti({
+          particleCount: 3,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1, y: 0.7 },
+          colors: ["#6366F1", "#A78BFA", "#F59E0B"],
+        });
+        if (Date.now() < end) requestAnimationFrame(frame);
+      };
+      frame();
+    }).catch(() => {
+      // Silently fail — confetti is cosmetic
+    });
 
     // Countdown
     timerRef.current = setInterval(() => {
@@ -107,6 +114,7 @@ export function MilestoneCelebration({
     }, 1000);
 
     return () => {
+      cancelled = true;
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [dismiss]);

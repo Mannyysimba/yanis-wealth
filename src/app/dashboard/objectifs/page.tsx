@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase/client";
 import { useExchangeRates } from "@/hooks/use-exchange-rates";
 import { useTabs } from "@/hooks/use-tabs";
 import { convertToEur } from "@/lib/currency";
-import { formatEur, formatCurrency } from "@/lib/format";
+import { formatEur, formatCurrency, safeDate } from "@/lib/format";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -138,7 +138,7 @@ export default function ObjectifsPage() {
       const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
       const daysFromNow = (d.getTime() - now.getTime()) / 86400000;
       const entry: { date: string; [key: string]: string | number } = {
-        date: d.toLocaleDateString("fr-FR", { month: "short", year: "2-digit" }),
+        date: safeDate(d, { month: "short", year: "2-digit" }),
       };
       for (const obj of active) {
         const targetEur = Number(obj.target_amount_eur) || (obj.remaining_eur + obj.current_amount_eur);
@@ -219,7 +219,7 @@ export default function ObjectifsPage() {
                   <span>Vélocité: <span className="font-semibold text-[var(--accent-green)]">+{formatEur(velocityDaily)} / jour</span></span>
                 )}
                 {globalProjectedDate && (
-                  <span>Tous les objectifs atteints vers le <span className="font-semibold text-foreground">{globalProjectedDate.toLocaleDateString("fr-FR")}</span></span>
+                  <span>Tous les objectifs atteints vers le <span className="font-semibold text-foreground">{safeDate(globalProjectedDate)}</span></span>
                 )}
               </div>
             </div>
@@ -283,12 +283,12 @@ export default function ObjectifsPage() {
                       {/* Meta */}
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground pt-1 border-t border-[rgba(99,102,241,0.08)]">
                         <span>📅 {obj.days_left}j restants</span>
-                        <span>Date: {new Date(obj.target_date).toLocaleDateString("fr-FR")}</span>
+                        <span>Date: {safeDate(obj.target_date)}</span>
                         {obj.velocity_daily_eur > 0 && (
                           <span className="text-[var(--accent-green)]">+{formatEur(obj.velocity_daily_eur)}/j</span>
                         )}
                         {obj.projected_date && obj.remaining > 0 && (
-                          <span>📊 Proj: {obj.projected_date.toLocaleDateString("fr-FR")}</span>
+                          <span>📊 Proj: {safeDate(obj.projected_date)}</span>
                         )}
                       </div>
 
@@ -390,7 +390,7 @@ export default function ObjectifsPage() {
                     </div>
                     <p className="text-xs text-[var(--accent-green)]">
                       Objectif atteint le {obj.completed_at
-                        ? new Date(obj.completed_at).toLocaleDateString("fr-FR")
+                        ? safeDate(obj.completed_at)
                         : "—"}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">

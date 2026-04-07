@@ -30,10 +30,14 @@ export default function DashboardLayout({
           router.replace("/login");
         } else if (session) {
           setAuthChecked(true);
-          const splashKey = `splash-${new Date().toDateString()}`;
-          if (!sessionStorage.getItem(splashKey)) {
-            setShowSplash(true);
-            sessionStorage.setItem(splashKey, "1");
+          try {
+            const splashKey = `splash-${new Date().toDateString()}`;
+            if (typeof window !== "undefined" && !sessionStorage.getItem(splashKey)) {
+              setShowSplash(true);
+              sessionStorage.setItem(splashKey, "1");
+            }
+          } catch {
+            // sessionStorage unavailable (e.g. private browsing)
           }
         }
       }

@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatCurrency, formatEur } from "@/lib/format";
+import { formatCurrency, formatEur, safeDate } from "@/lib/format";
 import { convertToEur } from "@/lib/currency";
 import { CURRENCY_SYMBOLS } from "@/lib/constants";
 import type { Objective, Tab, DailySnapshot } from "@/types";
@@ -195,7 +195,7 @@ export function TabObjective({ tab, currentTotal }: TabObjectiveProps) {
 
       {objective.is_completed ? (
         <p className="text-xs text-[var(--accent-green)]">
-          Objectif atteint le {new Date(objective.completed_at!).toLocaleDateString("fr-FR")}
+          Objectif atteint le {safeDate(objective.completed_at!)}
         </p>
       ) : (
         <>
@@ -224,7 +224,7 @@ export function TabObjective({ tab, currentTotal }: TabObjectiveProps) {
             )}
             <span>{daysLeft}j restants</span>
             {projectedDate && remaining > 0 && (
-              <span>📊 Proj: {projectedDate.toLocaleDateString("fr-FR")}</span>
+              <span>📊 Proj: {safeDate(projectedDate)}</span>
             )}
           </div>
 

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CURRENCY_SYMBOLS } from "@/lib/constants";
-import { timeAgo } from "@/lib/format";
+import { timeAgo, safeNumberFormat } from "@/lib/format";
 import { TabObjective } from "@/components/tab-objective";
 import type { LineItem, Tab } from "@/types";
 
@@ -21,7 +21,7 @@ function parseNum(value: string): number {
 
 function formatDisplay(amount: number): string {
   if (amount === 0) return "";
-  return amount.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return safeNumberFormat(amount, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
 export function LineItemForm({ tab }: LineItemFormProps) {

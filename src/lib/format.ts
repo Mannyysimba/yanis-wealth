@@ -1,11 +1,41 @@
 import { CURRENCY_SYMBOLS } from './constants';
 
+export function safeNumberFormat(value: number, options?: Intl.NumberFormatOptions): string {
+  try {
+    return new Intl.NumberFormat('fr-FR', options).format(value);
+  } catch {
+    return value.toFixed(options?.minimumFractionDigits ?? 2).replace('.', ',');
+  }
+}
+
+export function safeDate(date: Date | string, options?: Intl.DateTimeFormatOptions): string {
+  try {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    return d.toLocaleDateString('fr-FR', options);
+  } catch {
+    const d = typeof date === 'string' ? date : date.toISOString().split('T')[0];
+    return d;
+  }
+}
+
+export function safeDateTime(date: Date | string): string {
+  try {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    return d.toLocaleString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    const d = typeof date === 'string' ? date : date.toISOString();
+    return d;
+  }
+}
+
 export function formatEur(value: number): string {
-  const formatted = new Intl.NumberFormat('fr-FR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-  return `${formatted} €`;
+  return `${safeNumberFormat(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 }
 
 export function formatEurShort(value: number): string {
@@ -20,11 +50,7 @@ export function formatEurShort(value: number): string {
 
 export function formatCurrency(value: number, currency: string): string {
   const symbol = CURRENCY_SYMBOLS[currency] || currency;
-  const formatted = new Intl.NumberFormat('fr-FR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-  return `${formatted} ${symbol}`;
+  return `${safeNumberFormat(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${symbol}`;
 }
 
 export function formatPercent(value: number): string {
@@ -33,7 +59,7 @@ export function formatPercent(value: number): string {
 }
 
 export function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('fr-FR', {
+  return safeDate(dateStr, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -41,13 +67,7 @@ export function formatDate(dateStr: string): string {
 }
 
 export function formatDateTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return safeDateTime(dateStr);
 }
 
 export function timeAgo(dateStr: string): string {

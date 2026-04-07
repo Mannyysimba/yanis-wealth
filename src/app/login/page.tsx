@@ -11,7 +11,6 @@ import Image from "next/image";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -20,12 +19,6 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
-
-    if (rememberMe) {
-      localStorage.setItem("yw-remember-me", "1");
-    } else {
-      localStorage.removeItem("yw-remember-me");
-    }
 
     const { error: authError } = await supabase.auth.signInWithPassword({
       email,
@@ -79,15 +72,6 @@ export default function LoginPage() {
               required
             />
           </div>
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="h-4 w-4 rounded border-border bg-background text-primary accent-primary cursor-pointer"
-            />
-            <span className="text-xs text-muted-foreground">Se rappeler de moi</span>
-          </label>
           {error && (
             <p className="text-sm text-[var(--accent-red)]">{error}</p>
           )}

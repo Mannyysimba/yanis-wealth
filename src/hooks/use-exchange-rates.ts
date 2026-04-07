@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getExchangeRates } from "@/lib/currency";
+import { safeDateTime } from "@/lib/format";
 
 export function useExchangeRates() {
   const [rates, setRates] = useState<Record<string, number>>({ EUR: 1 });
@@ -11,7 +12,7 @@ export function useExchangeRates() {
   useEffect(() => {
     getExchangeRates().then((r) => {
       setRates(r);
-      setLastUpdated(new Date().toLocaleString("fr-FR"));
+      setLastUpdated(safeDateTime(new Date()));
       setLoading(false);
     });
   }, []);

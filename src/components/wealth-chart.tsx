@@ -141,12 +141,18 @@ export function WealthChart({ chartData, loading }: WealthChartProps) {
                 tick={{ fontSize: 10, fill: "#94A3B8" }}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(v: number) =>
-                  new Intl.NumberFormat("fr-FR", {
-                    notation: "compact",
-                    compactDisplay: "short",
-                  }).format(v)
-                }
+                tickFormatter={(v: number) => {
+                  try {
+                    return new Intl.NumberFormat("fr-FR", {
+                      notation: "compact",
+                      compactDisplay: "short",
+                    }).format(v);
+                  } catch {
+                    if (Math.abs(v) >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
+                    if (Math.abs(v) >= 1000) return `${(v / 1000).toFixed(0)}K`;
+                    return v.toString();
+                  }
+                }}
                 stroke="rgba(255,255,255,0.05)"
               />
               <Tooltip

@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase/client";
 import { useExchangeRates } from "@/hooks/use-exchange-rates";
 import { useTabs } from "@/hooks/use-tabs";
 import { convertToEur } from "@/lib/currency";
-import { formatEur, formatPercent } from "@/lib/format";
+import { formatEur, formatPercent, safeDate } from "@/lib/format";
 import { SummaryCards } from "@/components/summary-cards";
 import { WealthChart } from "@/components/wealth-chart";
 import { AllocationChart } from "@/components/allocation-chart";
@@ -195,20 +195,14 @@ export default function DashboardPage() {
     const points = snapshots
       .filter((s) => s.snapshot_date !== today)
       .map((s) => ({
-        date: new Date(s.snapshot_date).toLocaleDateString("fr-FR", {
-          day: "2-digit",
-          month: "2-digit",
-        }),
+        date: safeDate(s.snapshot_date, { day: "2-digit", month: "2-digit" }),
         total: Number(s.total_eur),
       }));
 
     // Always add today's live point if we have data
     if (calculations.totalPatrimoine > 0 || lineItems.length > 0) {
       points.push({
-        date: new Date().toLocaleDateString("fr-FR", {
-          day: "2-digit",
-          month: "2-digit",
-        }),
+        date: safeDate(new Date(), { day: "2-digit", month: "2-digit" }),
         total: calculations.totalPatrimoine,
       });
     }
@@ -216,7 +210,7 @@ export default function DashboardPage() {
     return points;
   }, [snapshots, calculations.totalPatrimoine, lineItems.length]);
 
-  const today = new Date().toLocaleDateString("fr-FR", {
+  const today = safeDate(new Date(), {
     weekday: "long",
     day: "numeric",
     month: "long",
