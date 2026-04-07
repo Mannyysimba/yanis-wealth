@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useExchangeRates } from "@/hooks/use-exchange-rates";
 import { useTabs } from "@/hooks/use-tabs";
@@ -20,21 +20,40 @@ export default function DashboardPage() {
   const [snapshots, setSnapshots] = useState<DailySnapshot[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchData() {
-      const [itemsRes, snapshotsRes] = await Promise.all([
-        supabase.from("line_items").select("*"),
-        supabase
-          .from("daily_snapshots")
-          .select("*")
-          .order("snapshot_date", { ascending: true }),
-      ]);
-      if (itemsRes.data) setLineItems(itemsRes.data);
-      if (snapshotsRes.data) setSnapshots(snapshotsRes.data);
-      setItemsLoading(false);
-    }
-    fetchData();
+  const fetchData = useCallback(async () => {
+    const [itemsRes, snapshotsRes] = await Promise.all([
+      supabase.from("line_items").select("*"),
+      supabase
+        .from("daily_snapshots")
+        .select("*")
+        .order("snapshot_date", { ascending: true }),
+    ]);
+    if (itemsRes.data) setLineItems(itemsRes.data);
+    if (snapshotsRes.data) setSnapshots(snapshotsRes.data);
+    setItemsLoading(false);
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Supabase realtime: re-fetch when line_items change
+  useEffect(() => {
+    const channel = supabase
+      .channel("line_items_realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "line_items" },
+        () => {
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchData]);
 
   const loading = ratesLoading || tabsLoading || itemsLoading;
 
@@ -132,9 +151,9 @@ export default function DashboardPage() {
       {/* Hero Section */}
       <div className="title-gradient rounded-2xl p-6 -mx-2 animate-fade-in">
         <p className="text-sm text-muted-foreground capitalize">{today}</p>
-        <h1 className="text-2xl font-bold tracking-tight mt-1">Bonjour Patron 👑</h1>
+        <h1 className="text-2xl font-bold tracking-tight mt-1">Bonjour Patron</h1>
         {!loading && (
-          <div className="mt-3 flex items-baseline gap-3">
+          <div className="mt-3 flex items-baseline gap-3 flex-wrap">
             <span className="text-3xl font-bold tracking-tight font-mono lg:text-4xl">
               {formatEur(calculations.totalPatrimoine)}
             </span>
@@ -147,6 +166,12 @@ export default function DashboardPage() {
               </span>
             )}
           </div>
+        )}
+        {!loading && (
+          <p className="text-xs text-muted-foreground mt-2 font-mono">
+            1 € = {(rates.MAD || 10.85).toFixed(2)} MAD · {(rates.AED || 3.97).toFixed(2)} AED · {(rates.USD || 1.08).toFixed(2)} $
+            {lastUpdated && <span className="ml-2 text-muted-foreground/60">· {lastUpdated}</span>}
+          </p>
         )}
       </div>
 

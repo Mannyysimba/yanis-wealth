@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useTabs } from "@/hooks/use-tabs";
+import { useLineItems } from "@/hooks/use-line-items";
+import { useExchangeRates } from "@/hooks/use-exchange-rates";
 import { Sidebar } from "@/components/sidebar";
 import { MobileNav } from "@/components/mobile-nav";
 import { WelcomeSplash } from "@/components/welcome-splash";
@@ -15,6 +17,8 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const { tabs, loading } = useTabs();
+  const { lineItems } = useLineItems();
+  const { rates } = useExchangeRates();
   const [authChecked, setAuthChecked] = useState(false);
   const [showSplash, setShowSplash] = useState(false);
 
@@ -49,7 +53,7 @@ export default function DashboardLayout({
     <>
       {showSplash && <WelcomeSplash onDone={handleSplashDone} />}
       <div className="flex min-h-screen bg-gradient-radial">
-        <Sidebar tabs={tabs} loading={loading} />
+        <Sidebar tabs={tabs} loading={loading} lineItems={lineItems} rates={rates} />
         <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
           <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
             {children}

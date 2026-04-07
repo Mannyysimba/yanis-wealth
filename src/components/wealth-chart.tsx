@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   AreaChart,
   Area,
@@ -8,7 +8,6 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  CartesianGrid,
 } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatEur } from "@/lib/format";
@@ -20,8 +19,34 @@ interface WealthChartProps {
   loading: boolean;
 }
 
+function ActiveDot(props: Record<string, unknown>) {
+  const { cx, cy } = props as { cx: number; cy: number };
+  return (
+    <g>
+      <circle
+        cx={cx}
+        cy={cy}
+        r={6}
+        fill="#6366F1"
+        stroke="#6366F1"
+        strokeWidth={2}
+        style={{
+          filter: "drop-shadow(0 0 8px rgba(99,102,241,0.8))",
+        }}
+      />
+      <circle cx={cx} cy={cy} r={3} fill="#fff" />
+    </g>
+  );
+}
+
 export function WealthChart({ snapshots, loading }: WealthChartProps) {
   const [range, setRange] = useState("30J");
+  const [animKey, setAnimKey] = useState(0);
+
+  const handleRangeChange = useCallback((newRange: string) => {
+    setRange(newRange);
+    setAnimKey((k) => k + 1);
+  }, []);
 
   const filtered = useMemo(() => {
     const selected = TIME_RANGES.find((r) => r.label === range);
@@ -55,7 +80,7 @@ export function WealthChart({ snapshots, loading }: WealthChartProps) {
           {TIME_RANGES.map((r) => (
             <button
               key={r.label}
-              onClick={() => setRange(r.label)}
+              onClick={() => handleRangeChange(r.label)}
               className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-all duration-150 ${
                 range === r.label
                   ? "bg-primary text-primary-foreground shadow-[0_0_12px_rgba(99,102,241,0.3)]"
@@ -75,16 +100,14 @@ export function WealthChart({ snapshots, loading }: WealthChartProps) {
             Aucune donnée disponible
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={300} key={animKey}>
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="wealthGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366F1" stopOpacity={0.35} />
-                  <stop offset="50%" stopColor="#818CF8" stopOpacity={0.1} />
-                  <stop offset="95%" stopColor="#6366F1" stopOpacity={0} />
+                  <stop offset="0%" stopColor="rgba(99,102,241,0.15)" />
+                  <stop offset="100%" stopColor="rgba(99,102,241,0)" />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,102,241,0.08)" />
               <XAxis
                 dataKey="date"
                 tick={{ fontSize: 10, fill: "#94A3B8" }}
@@ -101,6 +124,7 @@ export function WealthChart({ snapshots, loading }: WealthChartProps) {
                     compactDisplay: "short",
                   }).format(v)
                 }
+                stroke="rgba(255,255,255,0.05)"
               />
               <Tooltip
                 contentStyle={{
@@ -111,7 +135,7 @@ export function WealthChart({ snapshots, loading }: WealthChartProps) {
                   boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
                 }}
                 formatter={(value) => [formatEur(Number(value)), "Total"]}
-                labelFormatter={(label) => `Date: ${String(label)}`}
+                labelFormatter={(label) => `${String(label)}`}
               />
               <Area
                 type="monotone"
@@ -119,7 +143,10 @@ export function WealthChart({ snapshots, loading }: WealthChartProps) {
                 stroke="#6366F1"
                 strokeWidth={2.5}
                 fill="url(#wealthGrad)"
-                animationDuration={1500}
+                dot={false}
+                activeDot={<ActiveDot />}
+                animationDuration={600}
+                animationEasing="ease-in-out"
               />
             </AreaChart>
           </ResponsiveContainer>

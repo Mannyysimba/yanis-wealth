@@ -5,12 +5,17 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./theme-toggle";
-import type { Tab } from "@/types";
+import { formatCurrency, formatEur } from "@/lib/format";
+import { convertToEur } from "@/lib/currency";
+import { FALLBACK_RATES } from "@/lib/constants";
+import type { Tab, LineItem } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface SidebarProps {
   tabs: Tab[];
   loading: boolean;
+  lineItems?: LineItem[];
+  rates?: Record<string, number>;
 }
 
 const sectionLabels: Record<string, string> = {
@@ -18,7 +23,13 @@ const sectionLabels: Record<string, string> = {
   investissement: "📈 INVESTISSEMENT",
 };
 
-export function Sidebar({ tabs, loading }: SidebarProps) {
+function getTabTotal(tabId: string, lineItems: LineItem[]): number {
+  return lineItems
+    .filter((li) => li.tab_id === tabId)
+    .reduce((s, li) => s + Number(li.amount), 0);
+}
+
+export function Sidebar({ tabs, loading, lineItems = [], rates = FALLBACK_RATES }: SidebarProps) {
   const pathname = usePathname();
 
   const capitalTabs = tabs.filter((t) => t.section === "capital");
@@ -84,40 +95,68 @@ export function Sidebar({ tabs, loading }: SidebarProps) {
                 {items.map((tab) => {
                   const hasChildren = tab.children && tab.children.length > 0;
                   if (hasChildren) {
+                    // Parent total = sum of children in EUR
+                    const parentTotalEur = tab.children!.reduce((sum, child) => {
+                      const childTotal = getTabTotal(child.id, lineItems);
+                      return sum + convertToEur(childTotal, child.currency, rates);
+                    }, 0);
+
                     return (
                       <div key={tab.id} className="space-y-0.5">
-                        <p className="px-3 py-1 text-xs font-semibold text-foreground/70">
-                          {tab.name}
-                        </p>
-                        {tab.children!.map((child) => (
-                          <Link
-                            key={child.id}
-                            href={`/dashboard/${key}/${child.slug}`}
-                            className={cn(
-                              "flex items-center rounded-lg px-3 py-1.5 pl-7 text-sm transition-all duration-150",
-                              pathname === `/dashboard/${key}/${child.slug}`
-                                ? "bg-primary/15 text-primary shadow-[0_0_12px_rgba(99,102,241,0.15)]"
-                                : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                            )}
-                          >
-                            {child.name}
-                          </Link>
-                        ))}
+                        <div className="flex items-center justify-between px-3 py-1">
+                          <p className="text-xs font-semibold text-foreground/70">
+                            {tab.name}
+                          </p>
+                          {parentTotalEur > 0 && (
+                            <span className="text-[10px] font-mono text-muted-foreground tabular-nums">
+                              {formatEur(parentTotalEur)}
+                            </span>
+                          )}
+                        </div>
+                        {tab.children!.map((child) => {
+                          const childTotal = getTabTotal(child.id, lineItems);
+                          return (
+                            <Link
+                              key={child.id}
+                              href={`/dashboard/${key}/${child.slug}`}
+                              className={cn(
+                                "flex items-center justify-between rounded-lg px-3 py-1.5 pl-7 text-sm transition-all duration-150",
+                                pathname === `/dashboard/${key}/${child.slug}`
+                                  ? "bg-primary/15 text-primary shadow-[0_0_12px_rgba(99,102,241,0.15)]"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                              )}
+                            >
+                              <span>{child.name}</span>
+                              {childTotal > 0 && (
+                                <span className="text-[10px] font-mono text-muted-foreground/70 tabular-nums">
+                                  {formatCurrency(childTotal, child.currency)}
+                                </span>
+                              )}
+                            </Link>
+                          );
+                        })}
                       </div>
                     );
                   }
+
+                  const tabTotal = getTabTotal(tab.id, lineItems);
                   return (
                     <Link
                       key={tab.id}
                       href={`/dashboard/${key}/${tab.slug}`}
                       className={cn(
-                        "flex items-center rounded-lg px-3 py-1.5 text-sm transition-all duration-150",
+                        "flex items-center justify-between rounded-lg px-3 py-1.5 text-sm transition-all duration-150",
                         pathname === `/dashboard/${key}/${tab.slug}`
                           ? "bg-primary/15 text-primary shadow-[0_0_12px_rgba(99,102,241,0.15)]"
                           : "text-muted-foreground hover:text-foreground hover:bg-accent"
                       )}
                     >
-                      {tab.name}
+                      <span>{tab.name}</span>
+                      {tabTotal > 0 && (
+                        <span className="text-[10px] font-mono text-muted-foreground/70 tabular-nums">
+                          {formatCurrency(tabTotal, tab.currency)}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}

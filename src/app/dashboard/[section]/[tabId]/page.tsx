@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { LineItemForm } from "@/components/line-item-form";
+import { CryptoAssetForm } from "@/components/crypto-asset-form";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Tab } from "@/types";
+
+const CRYPTO_SLUGS = ["tangem", "trust-wallet", "ledger"];
 
 export default function TabPage({
   params,
@@ -16,7 +19,6 @@ export default function TabPage({
 
   useEffect(() => {
     async function fetchTab() {
-      // Find tab by slug
       const { data, error } = await supabase
         .from("tabs")
         .select("*")
@@ -51,9 +53,11 @@ export default function TabPage({
     );
   }
 
+  const isCrypto = CRYPTO_SLUGS.includes(tab.slug);
+
   return (
-    <div className="max-w-2xl animate-fade-in">
-      <LineItemForm tab={tab} />
+    <div className={isCrypto ? "max-w-4xl animate-fade-in" : "max-w-2xl animate-fade-in"}>
+      {isCrypto ? <CryptoAssetForm tab={tab} /> : <LineItemForm tab={tab} />}
     </div>
   );
 }
