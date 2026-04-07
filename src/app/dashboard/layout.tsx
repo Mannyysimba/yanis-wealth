@@ -3,9 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
-import { useTabs } from "@/hooks/use-tabs";
-import { useLineItems } from "@/hooks/use-line-items";
-import { useExchangeRates } from "@/hooks/use-exchange-rates";
+import { WealthProvider } from "@/contexts/wealth-context";
 import { Sidebar } from "@/components/sidebar";
 import { MobileNav } from "@/components/mobile-nav";
 import { WelcomeSplash } from "@/components/welcome-splash";
@@ -16,14 +14,10 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { tabs, loading } = useTabs();
-  const { lineItems } = useLineItems();
-  const { rates } = useExchangeRates();
   const [authChecked, setAuthChecked] = useState(false);
   const [showSplash, setShowSplash] = useState(false);
 
   useEffect(() => {
-    // Listen for auth state changes — handles token refresh automatically
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (event === "SIGNED_OUT" || (!session && event === "INITIAL_SESSION")) {
@@ -37,7 +31,7 @@ export default function DashboardLayout({
               sessionStorage.setItem(splashKey, "1");
             }
           } catch {
-            // sessionStorage unavailable (e.g. private browsing)
+            // sessionStorage unavailable
           }
         }
       }
@@ -61,17 +55,17 @@ export default function DashboardLayout({
   }
 
   return (
-    <>
+    <WealthProvider>
       {showSplash && <WelcomeSplash onDone={handleSplashDone} />}
       <div className="flex min-h-screen bg-gradient-radial">
-        <Sidebar tabs={tabs} loading={loading} lineItems={lineItems} rates={rates} />
+        <Sidebar />
         <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
           <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
             {children}
           </div>
         </main>
-        <MobileNav tabs={tabs} lineItems={lineItems} rates={rates} />
+        <MobileNav />
       </div>
-    </>
+    </WealthProvider>
   );
 }

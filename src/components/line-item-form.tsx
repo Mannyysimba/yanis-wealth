@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CURRENCY_SYMBOLS } from "@/lib/constants";
 import { timeAgo, safeNumberFormat } from "@/lib/format";
 import { TabObjective } from "@/components/tab-objective";
+import { useWealth } from "@/contexts/wealth-context";
 import type { LineItem, Tab } from "@/types";
 
 interface LineItemFormProps {
@@ -25,6 +26,7 @@ function formatDisplay(amount: number): string {
 }
 
 export function LineItemForm({ tab }: LineItemFormProps) {
+  const { refreshTotals } = useWealth();
   const [items, setItems] = useState<LineItem[]>([]);
   const [rawInputs, setRawInputs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -85,7 +87,7 @@ export function LineItemForm({ tab }: LineItemFormProps) {
       .update({ amount: num, updated_at: now })
       .eq("id", id);
     setLastModified(now);
-    window.dispatchEvent(new Event("line-items-updated"));
+    refreshTotals();
   };
 
   const handleSaveAll = async () => {
@@ -102,7 +104,7 @@ export function LineItemForm({ tab }: LineItemFormProps) {
     setLastModified(now);
     setSaving(false);
     fetchItems();
-    window.dispatchEvent(new Event("line-items-updated"));
+    refreshTotals();
   };
 
   const handleAdd = async () => {
@@ -135,7 +137,7 @@ export function LineItemForm({ tab }: LineItemFormProps) {
       delete next[id];
       return next;
     });
-    window.dispatchEvent(new Event("line-items-updated"));
+    refreshTotals();
   };
 
   const handleRename = async (id: string) => {

@@ -7,20 +7,13 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./theme-toggle";
 import { formatCurrency, formatEur } from "@/lib/format";
 import { convertToEur } from "@/lib/currency";
-import { FALLBACK_RATES } from "@/lib/constants";
-import type { Tab, LineItem } from "@/types";
+import { useWealth } from "@/contexts/wealth-context";
 import { Skeleton } from "@/components/ui/skeleton";
-
-interface SidebarProps {
-  tabs: Tab[];
-  loading: boolean;
-  lineItems?: LineItem[];
-  rates?: Record<string, number>;
-}
+import type { LineItem } from "@/types";
 
 const sectionLabels: Record<string, string> = {
-  capital: "💰 CAPITAL",
-  investissement: "📈 INVESTISSEMENT",
+  capital: "CAPITAL",
+  investissement: "INVESTISSEMENT",
 };
 
 function getTabTotal(tabId: string, lineItems: LineItem[]): number {
@@ -29,8 +22,9 @@ function getTabTotal(tabId: string, lineItems: LineItem[]): number {
     .reduce((s, li) => s + Number(li.amount), 0);
 }
 
-export function Sidebar({ tabs, loading, lineItems = [], rates = FALLBACK_RATES }: SidebarProps) {
+export function Sidebar() {
   const pathname = usePathname();
+  const { tabs, lineItems, rates, loading } = useWealth();
 
   const capitalTabs = tabs.filter((t) => t.section === "capital");
   const investTabs = tabs.filter((t) => t.section === "investissement");
@@ -95,7 +89,6 @@ export function Sidebar({ tabs, loading, lineItems = [], rates = FALLBACK_RATES 
                 {items.map((tab) => {
                   const hasChildren = tab.children && tab.children.length > 0;
                   if (hasChildren) {
-                    // Parent total = sum of children in EUR
                     const parentTotalEur = tab.children!.reduce((sum, child) => {
                       const childTotal = getTabTotal(child.id, lineItems);
                       return sum + convertToEur(childTotal, child.currency, rates);

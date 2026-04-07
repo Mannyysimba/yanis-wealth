@@ -5,14 +5,8 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { convertToEur } from "@/lib/currency";
 import { formatEurShort } from "@/lib/format";
-import { FALLBACK_RATES } from "@/lib/constants";
+import { useWealth } from "@/contexts/wealth-context";
 import type { Tab, LineItem } from "@/types";
-
-interface MobileNavProps {
-  tabs?: Tab[];
-  lineItems?: LineItem[];
-  rates?: Record<string, number>;
-}
 
 function getSectionTotal(
   section: string,
@@ -34,8 +28,9 @@ function getSectionTotal(
   return total;
 }
 
-export function MobileNav({ tabs = [], lineItems = [], rates = FALLBACK_RATES }: MobileNavProps) {
+export function MobileNav() {
   const pathname = usePathname();
+  const { tabs, lineItems, rates } = useWealth();
 
   const capitalTotal = tabs.length > 0 ? getSectionTotal("capital", tabs, lineItems, rates) : 0;
   const investTotal = tabs.length > 0 ? getSectionTotal("investissement", tabs, lineItems, rates) : 0;

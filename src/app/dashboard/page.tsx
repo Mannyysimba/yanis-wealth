@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { supabase } from "@/lib/supabase/client";
-import { useExchangeRates } from "@/hooks/use-exchange-rates";
-import { useTabs } from "@/hooks/use-tabs";
+import { useWealth } from "@/contexts/wealth-context";
 import { convertToEur } from "@/lib/currency";
 import { formatEur, formatPercent, safeDate } from "@/lib/format";
 import { SummaryCards } from "@/components/summary-cards";
@@ -12,57 +11,31 @@ import { AllocationChart } from "@/components/allocation-chart";
 import { CurrencyTable } from "@/components/currency-table";
 import { ObjectivesSection } from "@/components/objectives-section";
 import { MilestoneCelebration, NextMilestoneBar, checkForNewMilestone } from "@/components/milestone-celebration";
-import type { LineItem, DailySnapshot, BreakdownItem } from "@/types";
+import type { DailySnapshot, BreakdownItem } from "@/types";
 
 function todayISO() {
   return new Date().toISOString().split("T")[0];
 }
 
 export default function DashboardPage() {
-  const { rates, loading: ratesLoading, lastUpdated } = useExchangeRates();
-  const { tabs, loading: tabsLoading } = useTabs();
-  const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const { tabs, lineItems, rates, ratesLastUpdated: lastUpdated, loading: wealthLoading } = useWealth();
   const [snapshots, setSnapshots] = useState<DailySnapshot[]>([]);
-  const [itemsLoading, setItemsLoading] = useState(true);
+  const [snapshotsLoading, setSnapshotsLoading] = useState(true);
   const [activeMilestone, setActiveMilestone] = useState<{ amount: number; label: string; emoji: string; message: string } | null>(null);
   const upsertTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchData = useCallback(async () => {
-    const [itemsRes, snapshotsRes] = await Promise.all([
-      supabase.from("line_items").select("*"),
-      supabase
-        .from("daily_snapshots")
-        .select("*")
-        .order("snapshot_date", { ascending: true }),
-    ]);
-    if (itemsRes.data) setLineItems(itemsRes.data);
-    if (snapshotsRes.data) setSnapshots(snapshotsRes.data);
-    setItemsLoading(false);
+  useEffect(() => {
+    supabase
+      .from("daily_snapshots")
+      .select("*")
+      .order("snapshot_date", { ascending: true })
+      .then(({ data }) => {
+        if (data) setSnapshots(data);
+        setSnapshotsLoading(false);
+      });
   }, []);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Supabase realtime: re-fetch when line_items change
-  useEffect(() => {
-    const channel = supabase
-      .channel("line_items_realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "line_items" },
-        () => {
-          fetchData();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [fetchData]);
-
-  const loading = ratesLoading || tabsLoading || itemsLoading;
+  const loading = wealthLoading || snapshotsLoading;
 
   const calculations = useMemo(() => {
     const allTabs = tabs.flatMap((t) =>
@@ -112,7 +85,6 @@ export default function DashboardPage() {
 
     const totalPatrimoine = capitalTotal + investTotal;
 
-    // Variation = compare to previous snapshot (not today's)
     let variation24h = 0;
     let variationPercent = 0;
     const pastSnapshots = snapshots.filter((s) => s.snapshot_date !== todayISO());
@@ -158,7 +130,7 @@ export default function DashboardPage() {
     if (milestone) setActiveMilestone(milestone);
   }, [loading, calculations.totalPatrimoine]);
 
-  // Auto-upsert today's snapshot whenever totalPatrimoine changes (debounced 2s)
+  // Auto-upsert today's snapshot (debounced 2s)
   useEffect(() => {
     if (loading || calculations.totalPatrimoine === 0) return;
 
@@ -176,7 +148,6 @@ export default function DashboardPage() {
         },
         { onConflict: "snapshot_date" }
       );
-      // Re-fetch snapshots to keep chart in sync
       const { data } = await supabase
         .from("daily_snapshots")
         .select("*")
@@ -189,7 +160,6 @@ export default function DashboardPage() {
     };
   }, [loading, calculations.totalPatrimoine, calculations.capitalTotal, calculations.investTotal, calculations.breakdown, rates]);
 
-  // Build chart data: historical snapshots + live today point
   const chartData = useMemo(() => {
     const today = todayISO();
     const points = snapshots
@@ -199,7 +169,6 @@ export default function DashboardPage() {
         total: Number(s.total_eur),
       }));
 
-    // Always add today's live point if we have data
     if (calculations.totalPatrimoine > 0 || lineItems.length > 0) {
       points.push({
         date: safeDate(new Date(), { day: "2-digit", month: "2-digit" }),
@@ -219,7 +188,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Milestone celebration */}
       {activeMilestone && (
         <MilestoneCelebration
           milestone={activeMilestone}
@@ -227,7 +195,6 @@ export default function DashboardPage() {
         />
       )}
 
-      {/* Hero Section */}
       <div className="title-gradient rounded-2xl p-6 -mx-2 animate-fade-in">
         <p className="text-sm text-muted-foreground capitalize">{today}</p>
         <h1 className="text-2xl font-bold tracking-tight mt-1">Bonjour Patron</h1>

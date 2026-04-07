@@ -10,6 +10,7 @@ import { convertToEur } from "@/lib/currency";
 import { FALLBACK_RATES } from "@/lib/constants";
 import { timeAgo, formatCurrency, formatEur, safeNumberFormat } from "@/lib/format";
 import { TabObjective } from "@/components/tab-objective";
+import { useWealth } from "@/contexts/wealth-context";
 import type { LineItem, Tab } from "@/types";
 
 interface CryptoAssetFormProps {
@@ -59,6 +60,7 @@ function formatPrice(price: number): string {
 }
 
 export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
+  const { refreshTotals } = useWealth();
   const [items, setItems] = useState<LineItem[]>([]);
   const [prices, setPrices] = useState<AssetPrice[]>([]);
   const [rates, setRates] = useState<Record<string, number>>(FALLBACK_RATES);
@@ -268,13 +270,13 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
       .update({ amount: num, updated_at: now })
       .eq("id", id);
     setLastModified(now);
-    window.dispatchEvent(new Event("line-items-updated"));
+    refreshTotals();
   };
 
   const handleDelete = async (id: string) => {
     await supabase.from("line_items").delete().eq("id", id);
     setItems((prev) => prev.filter((item) => item.id !== id));
-    window.dispatchEvent(new Event("line-items-updated"));
+    refreshTotals();
   };
 
   const totalUsd = items.reduce((sum, item) => {
