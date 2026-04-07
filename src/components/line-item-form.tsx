@@ -85,6 +85,7 @@ export function LineItemForm({ tab }: LineItemFormProps) {
       .update({ amount: num, updated_at: now })
       .eq("id", id);
     setLastModified(now);
+    window.dispatchEvent(new Event("line-items-updated"));
   };
 
   const handleSaveAll = async () => {
@@ -101,6 +102,7 @@ export function LineItemForm({ tab }: LineItemFormProps) {
     setLastModified(now);
     setSaving(false);
     fetchItems();
+    window.dispatchEvent(new Event("line-items-updated"));
   };
 
   const handleAdd = async () => {
@@ -133,6 +135,7 @@ export function LineItemForm({ tab }: LineItemFormProps) {
       delete next[id];
       return next;
     });
+    window.dispatchEvent(new Event("line-items-updated"));
   };
 
   const handleRename = async (id: string) => {

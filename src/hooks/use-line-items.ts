@@ -36,5 +36,21 @@ export function useLineItems() {
     };
   }, [fetchItems]);
 
+  // Refetch on custom event (fired by form components after save) and on focus
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") fetchItems();
+    };
+    const handleRefresh = () => fetchItems();
+    window.addEventListener("line-items-updated", handleRefresh);
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleRefresh);
+    return () => {
+      window.removeEventListener("line-items-updated", handleRefresh);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleRefresh);
+    };
+  }, [fetchItems]);
+
   return { lineItems, loading };
 }

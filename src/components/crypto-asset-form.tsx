@@ -268,11 +268,13 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
       .update({ amount: num, updated_at: now })
       .eq("id", id);
     setLastModified(now);
+    window.dispatchEvent(new Event("line-items-updated"));
   };
 
   const handleDelete = async (id: string) => {
     await supabase.from("line_items").delete().eq("id", id);
     setItems((prev) => prev.filter((item) => item.id !== id));
+    window.dispatchEvent(new Event("line-items-updated"));
   };
 
   const totalUsd = items.reduce((sum, item) => {
