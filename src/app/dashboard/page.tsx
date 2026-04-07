@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useExchangeRates } from "@/hooks/use-exchange-rates";
 import { useTabs } from "@/hooks/use-tabs";
@@ -13,12 +13,17 @@ import { CurrencyTable } from "@/components/currency-table";
 import { ObjectivesSection } from "@/components/objectives-section";
 import type { LineItem, DailySnapshot, BreakdownItem } from "@/types";
 
+function todayISO() {
+  return new Date().toISOString().split("T")[0];
+}
+
 export default function DashboardPage() {
   const { rates, loading: ratesLoading, lastUpdated } = useExchangeRates();
   const { tabs, loading: tabsLoading } = useTabs();
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [snapshots, setSnapshots] = useState<DailySnapshot[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
+  const upsertTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchData = useCallback(async () => {
     const [itemsRes, snapshotsRes] = await Promise.all([
@@ -71,6 +76,7 @@ export default function DashboardPage() {
       Crypto: 0,
       Immobilier: 0,
     };
+    const breakdown: Record<string, number> = {};
 
     for (const tab of allTabs) {
       const tabItems = lineItems.filter((li) => li.tab_id === tab.id);
@@ -81,6 +87,7 @@ export default function DashboardPage() {
       }
 
       const eurValue = convertToEur(rawSum, tab.currency, rates);
+      breakdown[tab.name] = eurValue;
       const parent = tabs.find((p) => p.id === tab.parent_id || p.id === tab.id);
       const parentName = parent?.name || tab.name;
 
@@ -103,10 +110,12 @@ export default function DashboardPage() {
 
     const totalPatrimoine = capitalTotal + investTotal;
 
+    // Variation = compare to previous snapshot (not today's)
     let variation24h = 0;
     let variationPercent = 0;
-    if (snapshots.length > 0) {
-      const yesterday = snapshots[snapshots.length - 1];
+    const pastSnapshots = snapshots.filter((s) => s.snapshot_date !== todayISO());
+    if (pastSnapshots.length > 0) {
+      const yesterday = pastSnapshots[pastSnapshots.length - 1];
       const yesterdayTotal = Number(yesterday.total_eur);
       variation24h = totalPatrimoine - yesterdayTotal;
       variationPercent =
@@ -136,8 +145,67 @@ export default function DashboardPage() {
       variationPercent,
       allocation,
       currencyRows,
+      breakdown,
     };
   }, [tabs, lineItems, rates, snapshots]);
+
+  // Auto-upsert today's snapshot whenever totalPatrimoine changes (debounced 2s)
+  useEffect(() => {
+    if (loading || calculations.totalPatrimoine === 0) return;
+
+    if (upsertTimer.current) clearTimeout(upsertTimer.current);
+    upsertTimer.current = setTimeout(async () => {
+      const today = todayISO();
+      await supabase.from("daily_snapshots").upsert(
+        {
+          snapshot_date: today,
+          total_eur: calculations.totalPatrimoine,
+          capital_eur: calculations.capitalTotal,
+          investissement_eur: calculations.investTotal,
+          breakdown_json: calculations.breakdown,
+          rates_used: rates,
+        },
+        { onConflict: "snapshot_date" }
+      );
+      // Re-fetch snapshots to keep chart in sync
+      const { data } = await supabase
+        .from("daily_snapshots")
+        .select("*")
+        .order("snapshot_date", { ascending: true });
+      if (data) setSnapshots(data);
+    }, 2000);
+
+    return () => {
+      if (upsertTimer.current) clearTimeout(upsertTimer.current);
+    };
+  }, [loading, calculations.totalPatrimoine, calculations.capitalTotal, calculations.investTotal, calculations.breakdown, rates]);
+
+  // Build chart data: historical snapshots + live today point
+  const chartData = useMemo(() => {
+    const today = todayISO();
+    const points = snapshots
+      .filter((s) => s.snapshot_date !== today)
+      .map((s) => ({
+        date: new Date(s.snapshot_date).toLocaleDateString("fr-FR", {
+          day: "2-digit",
+          month: "2-digit",
+        }),
+        total: Number(s.total_eur),
+      }));
+
+    // Always add today's live point if we have data
+    if (calculations.totalPatrimoine > 0 || lineItems.length > 0) {
+      points.push({
+        date: new Date().toLocaleDateString("fr-FR", {
+          day: "2-digit",
+          month: "2-digit",
+        }),
+        total: calculations.totalPatrimoine,
+      });
+    }
+
+    return points;
+  }, [snapshots, calculations.totalPatrimoine, lineItems.length]);
 
   const today = new Date().toLocaleDateString("fr-FR", {
     weekday: "long",
@@ -184,7 +252,7 @@ export default function DashboardPage() {
         loading={loading}
       />
 
-      <WealthChart snapshots={snapshots} loading={loading} />
+      <WealthChart chartData={chartData} loading={loading} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <AllocationChart

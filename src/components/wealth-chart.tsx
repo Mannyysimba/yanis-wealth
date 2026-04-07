@@ -12,10 +12,14 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatEur } from "@/lib/format";
 import { TIME_RANGES } from "@/lib/constants";
-import type { DailySnapshot } from "@/types";
+
+interface ChartPoint {
+  date: string;
+  total: number;
+}
 
 interface WealthChartProps {
-  snapshots: DailySnapshot[];
+  chartData: ChartPoint[];
   loading: boolean;
 }
 
@@ -30,16 +34,30 @@ function ActiveDot(props: Record<string, unknown>) {
         fill="#6366F1"
         stroke="#6366F1"
         strokeWidth={2}
-        style={{
-          filter: "drop-shadow(0 0 8px rgba(99,102,241,0.8))",
-        }}
+        style={{ filter: "drop-shadow(0 0 8px rgba(99,102,241,0.8))" }}
       />
       <circle cx={cx} cy={cy} r={3} fill="#fff" />
     </g>
   );
 }
 
-export function WealthChart({ snapshots, loading }: WealthChartProps) {
+function PulsingDot({ value }: { value: number }) {
+  return (
+    <div className="flex h-[300px] flex-col items-center justify-center gap-3">
+      <div className="relative">
+        <div className="absolute inset-0 h-5 w-5 rounded-full bg-[#6366F1] animate-ping opacity-30" />
+        <div
+          className="h-5 w-5 rounded-full bg-[#6366F1]"
+          style={{ boxShadow: "0 0 16px rgba(99,102,241,0.6)" }}
+        />
+      </div>
+      <p className="text-lg font-bold font-mono">{formatEur(value)}</p>
+      <p className="text-xs text-muted-foreground">Aujourd&apos;hui</p>
+    </div>
+  );
+}
+
+export function WealthChart({ chartData, loading }: WealthChartProps) {
   const [range, setRange] = useState("30J");
   const [animKey, setAnimKey] = useState(0);
 
@@ -50,7 +68,7 @@ export function WealthChart({ snapshots, loading }: WealthChartProps) {
 
   const filtered = useMemo(() => {
     const selected = TIME_RANGES.find((r) => r.label === range);
-    if (!selected || selected.days === 0) return snapshots;
+    if (!selected || selected.days === 0) return chartData;
 
     const now = new Date();
     let cutoff: Date;
@@ -61,16 +79,19 @@ export function WealthChart({ snapshots, loading }: WealthChartProps) {
       cutoff = new Date(now.getTime() - selected.days * 86400000);
     }
 
-    return snapshots.filter((s) => new Date(s.snapshot_date) >= cutoff);
-  }, [snapshots, range]);
+    return chartData.filter((s) => {
+      // Parse dd/mm date — assume current year
+      const parts = s.date.split("/");
+      if (parts.length === 2) {
+        const d = new Date(now.getFullYear(), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+        return d >= cutoff;
+      }
+      return true;
+    });
+  }, [chartData, range]);
 
-  const chartData = filtered.map((s) => ({
-    date: new Date(s.snapshot_date).toLocaleDateString("fr-FR", {
-      day: "2-digit",
-      month: "2-digit",
-    }),
-    total: Number(s.total_eur),
-  }));
+  const hasData = filtered.length > 0;
+  const singlePoint = filtered.length === 1;
 
   return (
     <div className="card-gradient-border card-hover-glow rounded-xl overflow-hidden">
@@ -95,13 +116,15 @@ export function WealthChart({ snapshots, loading }: WealthChartProps) {
       <div className="chart-bg-gradient px-2 pb-4">
         {loading ? (
           <Skeleton className="h-[300px] w-full mx-3" />
-        ) : chartData.length === 0 ? (
+        ) : !hasData ? (
           <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
-            Aucune donnée disponible
+            Commencez à saisir vos données pour voir la courbe
           </div>
+        ) : singlePoint ? (
+          <PulsingDot value={filtered[0].total} />
         ) : (
           <ResponsiveContainer width="100%" height={300} key={animKey}>
-            <AreaChart data={chartData}>
+            <AreaChart data={filtered}>
               <defs>
                 <linearGradient id="wealthGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="rgba(99,102,241,0.15)" />
@@ -145,7 +168,7 @@ export function WealthChart({ snapshots, loading }: WealthChartProps) {
                 fill="url(#wealthGrad)"
                 dot={false}
                 activeDot={<ActiveDot />}
-                animationDuration={600}
+                animationDuration={400}
                 animationEasing="ease-in-out"
               />
             </AreaChart>
