@@ -23,18 +23,25 @@ export default function DashboardLayout({
   const [showSplash, setShowSplash] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        router.replace("/login");
-      } else {
-        setAuthChecked(true);
-        const splashKey = `splash-${new Date().toDateString()}`;
-        if (!sessionStorage.getItem(splashKey)) {
-          setShowSplash(true);
-          sessionStorage.setItem(splashKey, "1");
+    // Listen for auth state changes — handles token refresh automatically
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "SIGNED_OUT" || (!session && event === "INITIAL_SESSION")) {
+          router.replace("/login");
+        } else if (session) {
+          setAuthChecked(true);
+          const splashKey = `splash-${new Date().toDateString()}`;
+          if (!sessionStorage.getItem(splashKey)) {
+            setShowSplash(true);
+            sessionStorage.setItem(splashKey, "1");
+          }
         }
       }
-    });
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [router]);
 
   const handleSplashDone = useCallback(() => setShowSplash(false), []);

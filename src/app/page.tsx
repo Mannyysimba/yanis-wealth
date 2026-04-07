@@ -8,13 +8,19 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        router.replace("/dashboard");
-      } else {
-        router.replace("/login");
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (session) {
+          router.replace("/dashboard");
+        } else if (event === "INITIAL_SESSION") {
+          router.replace("/login");
+        }
       }
-    });
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [router]);
 
   return (
