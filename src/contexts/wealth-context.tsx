@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { getExchangeRates } from "@/lib/currency";
-import { fetchAllPrices, getCoinId, type AssetPrice } from "@/lib/prices";
+import { fetchAllPrices, getCoinId } from "@/lib/prices";
 import { isCryptoTab } from "@/lib/crypto";
 import { safeDateTime } from "@/lib/format";
 import type { Tab, LineItem } from "@/types";
@@ -19,14 +19,6 @@ interface WealthState {
 }
 
 const WealthContext = createContext<WealthState | null>(null);
-
-function buildCryptoPriceMap(prices: AssetPrice[]): Record<string, number> {
-  const map: Record<string, number> = {};
-  for (const p of prices) {
-    map[p.symbol] = p.price_usd;
-  }
-  return map;
-}
 
 export function WealthProvider({ children }: { children: ReactNode }) {
   const [tabs, setTabs] = useState<Tab[]>([]);
@@ -93,25 +85,39 @@ export function WealthProvider({ children }: { children: ReactNode }) {
     }
     const symbols = Array.from(symbolSet);
 
-    // Resolve CoinGecko IDs for custom coins (not in KNOWN_COINS)
-    const extraIds: string[] = [];
+    // Build symbol → coinId map
+    const symbolToId: Record<string, string> = {};
     for (let i = 0; i < symbols.length; i++) {
       const coinId = getCoinId(symbols[i]);
-      if (coinId) extraIds.push(coinId);
+      if (coinId) symbolToId[symbols[i]] = coinId;
     }
 
-    const prices = await fetchAllPrices(extraIds);
-    setCryptoPrices(buildCryptoPriceMap(prices));
+    // Fetch prices (fetchAllPrices handles deduplication with KNOWN_COINS)
+    const coinIds = Object.values(symbolToId);
+    const prices = await fetchAllPrices(coinIds);
+
+    // Build coinId → price_usd lookup
+    const priceById: Record<string, number> = {};
+    for (const p of prices) {
+      priceById[p.id] = p.price_usd;
+    }
+
+    // Build final symbol → price_usd map using OUR symbol mapping
+    const map: Record<string, number> = {};
+    const entries = Object.entries(symbolToId);
+    for (let i = 0; i < entries.length; i++) {
+      const [sym, id] = entries[i];
+      map[sym] = priceById[id] || 0;
+    }
+    setCryptoPrices(map);
   }, []);
 
   const refreshTotals = useCallback(async () => {
     const { data } = await supabase.from("line_items").select("*");
     if (data) {
       setLineItems(data);
-      // Re-fetch crypto prices with current tabs and new items
-      const currentTabs = tabs;
-      if (currentTabs.length > 0) {
-        fetchCryptoPrices(currentTabs, data);
+      if (tabs.length > 0) {
+        fetchCryptoPrices(tabs, data);
       }
     }
   }, [tabs, fetchCryptoPrices]);

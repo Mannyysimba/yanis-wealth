@@ -126,6 +126,7 @@ export function LineItemForm({ tab }: LineItemFormProps) {
       setItems((prev) => [...prev, data]);
       setRawInputs((prev) => ({ ...prev, [data.id]: "" }));
       setNewLabel("");
+      refreshTotals();
     }
   };
 

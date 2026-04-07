@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabase/client";
-import { useExchangeRates } from "@/hooks/use-exchange-rates";
-import { useTabs } from "@/hooks/use-tabs";
+import { useWealth } from "@/contexts/wealth-context";
 import { convertToEur } from "@/lib/currency";
+import { isCryptoTab, getCryptoTabUsdTotal } from "@/lib/crypto";
 import { formatEur, formatCurrency, safeDate } from "@/lib/format";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -12,7 +12,7 @@ import {
   Cell, CartesianGrid,
   LineChart, Line, ReferenceLine,
 } from "recharts";
-import type { Objective, LineItem, DailySnapshot, ObjectiveWithContext } from "@/types";
+import type { Objective, DailySnapshot, ObjectiveWithContext } from "@/types";
 
 function getMotivation(progress: number): string {
   if (progress >= 90) return "Patron vous y êtes 🔥 Dernière ligne droite.";
@@ -30,29 +30,25 @@ function getBarColor(progress: number): string {
 }
 
 export default function ObjectifsPage() {
-  const { rates, loading: ratesLoading } = useExchangeRates();
-  const { tabs, loading: tabsLoading } = useTabs();
+  const { tabs, lineItems, rates, cryptoPrices, loading: wealthLoading } = useWealth();
   const [objectives, setObjectives] = useState<Objective[]>([]);
-  const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [snapshots, setSnapshots] = useState<DailySnapshot[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
-      const [objRes, itemsRes, snapRes] = await Promise.all([
+      const [objRes, snapRes] = await Promise.all([
         supabase.from("objectives").select("*").order("created_at"),
-        supabase.from("line_items").select("*"),
         supabase.from("daily_snapshots").select("*").order("snapshot_date", { ascending: true }),
       ]);
       if (objRes.data) setObjectives(objRes.data);
-      if (itemsRes.data) setLineItems(itemsRes.data);
       if (snapRes.data) setSnapshots(snapRes.data);
       setLoading(false);
     }
     fetchData();
   }, []);
 
-  const isLoading = loading || ratesLoading || tabsLoading;
+  const isLoading = loading || wealthLoading;
 
   // Calculate velocity
   const velocityDaily = useMemo(() => {
@@ -76,10 +72,20 @@ export default function ObjectifsPage() {
       const tabSection = tab?.section || "—";
       const currency = obj.target_currency || tab?.currency || "EUR";
 
-      // Current value in this tab
-      const tabItems = lineItems.filter((li) => li.tab_id === obj.tab_id);
-      const currentAmount = tabItems.reduce((s, li) => s + Number(li.amount), 0);
-      const currentAmountEur = convertToEur(currentAmount, currency, rates);
+      // Current value — handle crypto tabs correctly
+      let currentAmount: number;
+      let currentAmountEur: number;
+
+      if (tab && isCryptoTab(tab, tabs)) {
+        // For crypto: quantity × price = USD value
+        const usdTotal = getCryptoTabUsdTotal(tab.id, lineItems, cryptoPrices);
+        currentAmount = usdTotal;
+        currentAmountEur = convertToEur(usdTotal, "USD", rates);
+      } else {
+        const tabItems = lineItems.filter((li) => li.tab_id === obj.tab_id);
+        currentAmount = tabItems.reduce((s, li) => s + Number(li.amount), 0);
+        currentAmountEur = convertToEur(currentAmount, currency, rates);
+      }
 
       const targetAmount = Number(obj.target_amount);
       const progress = targetAmount > 0 ? Math.min((currentAmount / targetAmount) * 100, 100) : 0;
@@ -105,7 +111,7 @@ export default function ObjectifsPage() {
         projected_date: projectedDate,
       };
     });
-  }, [objectives, tabs, lineItems, rates, velocityDaily]);
+  }, [objectives, tabs, lineItems, rates, cryptoPrices, velocityDaily]);
 
   const active = enriched
     .filter((o) => !o.is_completed)

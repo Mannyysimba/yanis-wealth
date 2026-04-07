@@ -211,6 +211,7 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
 
     // Fetch price for the new coin immediately
     fetchPrices([symbol]);
+    refreshTotals();
 
     // Reset search
     setShowAddCustom(false);
