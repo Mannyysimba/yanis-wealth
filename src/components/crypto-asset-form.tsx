@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { fetchAllPrices, type AssetPrice } from "@/lib/prices";
+import { fetchAllPrices, searchCoins, KNOWN_COINS, type AssetPrice, type CoinSearchResult } from "@/lib/prices";
 import { convertToEur } from "@/lib/currency";
 import { FALLBACK_RATES } from "@/lib/constants";
 import { timeAgo, formatCurrency, formatEur } from "@/lib/format";
@@ -16,19 +16,42 @@ interface CryptoAssetFormProps {
   tab: Tab;
 }
 
+// Default assets per crypto tab — stored as symbol:coingeckoId
 const DEFAULT_ASSETS: Record<string, string[]> = {
-  tangem: ["XAU", "USDT", "ETH", "BTC", "KAS"],
+  tangem: ["PAXG", "USDT", "ETH", "BTC", "KAS", "TRX", "BNB"],
   "trust-wallet": ["BTC", "ETH", "USDT"],
   ledger: ["BTC", "ETH"],
 };
 
-const ASSET_NAMES: Record<string, string> = {
-  XAU: "Gold (oz)",
-  USDT: "Tether",
-  ETH: "Ethereum",
-  BTC: "Bitcoin",
-  KAS: "Kaspa",
-};
+// Custom CoinGecko IDs stored per line item in the label as "SYMBOL"
+// We maintain a map of symbol → coingecko ID for price lookups
+// This is stored in localStorage so custom assets persist their IDs
+function getStoredCoinIds(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem("yw-coin-ids") || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function storeCoinId(symbol: string, coinId: string) {
+  const stored = getStoredCoinIds();
+  stored[symbol] = coinId;
+  localStorage.setItem("yw-coin-ids", JSON.stringify(stored));
+}
+
+function getCoinId(symbol: string): string | undefined {
+  const known = KNOWN_COINS[symbol];
+  if (known) return known.id;
+  return getStoredCoinIds()[symbol];
+}
+
+function getCoinName(symbol: string): string {
+  const known = KNOWN_COINS[symbol];
+  if (known) return known.name;
+  return symbol;
+}
 
 export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
   const [items, setItems] = useState<LineItem[]>([]);
@@ -38,8 +61,13 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
   const [pricesLoading, setPricesLoading] = useState(true);
   const [lastPriceUpdate, setLastPriceUpdate] = useState<string | null>(null);
   const [showAddCustom, setShowAddCustom] = useState(false);
-  const [customLabel, setCustomLabel] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<CoinSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [selectedIdx, setSelectedIdx] = useState(-1);
   const [lastModified, setLastModified] = useState<string | null>(null);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const fetchItems = useCallback(async () => {
     const { data } = await supabase
@@ -60,9 +88,13 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
     setLoading(false);
   }, [tab.id]);
 
-  const fetchPrices = useCallback(async () => {
+  const fetchPrices = useCallback(async (extraSymbols: string[] = []) => {
     setPricesLoading(true);
-    const p = await fetchAllPrices();
+    // Collect all CoinGecko IDs we need
+    const extraIds = extraSymbols
+      .map((s) => getCoinId(s))
+      .filter((id): id is string => !!id);
+    const p = await fetchAllPrices(extraIds);
     setPrices(p);
     const updated = p.find((x) => x.last_updated)?.last_updated;
     if (updated) setLastPriceUpdate(updated);
@@ -81,15 +113,24 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
 
   useEffect(() => {
     fetchItems();
-    fetchPrices();
     fetchRates();
-  }, [fetchItems, fetchPrices, fetchRates]);
+  }, [fetchItems, fetchRates]);
+
+  // Fetch prices once items are loaded (so we know which custom IDs to include)
+  useEffect(() => {
+    if (loading) return;
+    const customSymbols = items.map((i) => i.label).filter((s) => !KNOWN_COINS[s]);
+    fetchPrices(customSymbols);
+  }, [loading, items.length, fetchPrices]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-refresh prices every 5 minutes
   useEffect(() => {
-    const interval = setInterval(fetchPrices, 5 * 60 * 1000);
+    const interval = setInterval(() => {
+      const customSymbols = items.map((i) => i.label).filter((s) => !KNOWN_COINS[s]);
+      fetchPrices(customSymbols);
+    }, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [fetchPrices]);
+  }, [fetchPrices, items]);
 
   // Ensure default assets exist as line items
   useEffect(() => {
@@ -112,7 +153,85 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
     })();
   }, [loading, items.length, tab.slug, tab.id, tab.currency, fetchItems]);
 
+  // Search handler with debounce
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setSelectedIdx(-1);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (value.length < 2) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    searchTimer.current = setTimeout(async () => {
+      const results = await searchCoins(value);
+      setSearchResults(results);
+      setSearching(false);
+    }, 300);
+  };
+
+  const handleSelectCoin = async (coin: CoinSearchResult) => {
+    const symbol = coin.symbol.toUpperCase();
+    // Store the CoinGecko ID for this symbol
+    storeCoinId(symbol, coin.id);
+    // Also add to KNOWN_COINS runtime
+    KNOWN_COINS[symbol] = { id: coin.id, name: coin.name };
+
+    const maxPos = items.reduce((max, i) => Math.max(max, i.position), -1);
+    const { data } = await supabase
+      .from("line_items")
+      .insert({
+        tab_id: tab.id,
+        label: symbol,
+        amount: 0,
+        currency: tab.currency,
+        position: maxPos + 1,
+      })
+      .select()
+      .single();
+
+    if (data) {
+      setItems((prev) => [...prev, data]);
+    }
+
+    // Fetch price for the new coin immediately
+    fetchPrices([symbol]);
+
+    // Reset search
+    setShowAddCustom(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    setSelectedIdx(-1);
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setShowAddCustom(false);
+      setSearchQuery("");
+      setSearchResults([]);
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedIdx((i) => Math.min(i + 1, searchResults.length - 1));
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedIdx((i) => Math.max(i - 1, 0));
+    }
+    if (e.key === "Enter" && selectedIdx >= 0 && searchResults[selectedIdx]) {
+      e.preventDefault();
+      handleSelectCoin(searchResults[selectedIdx]);
+    }
+  };
+
   const getPrice = (symbol: string): number => {
+    const coinId = getCoinId(symbol);
+    if (coinId) {
+      const found = prices.find((p) => p.id === coinId);
+      if (found) return found.price_usd;
+    }
     const found = prices.find(
       (p) => p.symbol === symbol || p.name.toLowerCase() === symbol.toLowerCase()
     );
@@ -135,28 +254,6 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
       .update({ amount: item.amount, updated_at: now })
       .eq("id", id);
     setLastModified(now);
-  };
-
-  const handleAddCustom = async () => {
-    if (!customLabel.trim()) return;
-    const maxPos = items.reduce((max, i) => Math.max(max, i.position), -1);
-    const { data } = await supabase
-      .from("line_items")
-      .insert({
-        tab_id: tab.id,
-        label: customLabel.trim().toUpperCase(),
-        amount: 0,
-        currency: tab.currency,
-        position: maxPos + 1,
-      })
-      .select()
-      .single();
-
-    if (data) {
-      setItems((prev) => [...prev, data]);
-      setCustomLabel("");
-      setShowAddCustom(false);
-    }
   };
 
   const handleDelete = async (id: string) => {
@@ -228,7 +325,7 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
           const qty = Number(item.amount);
           const rowTotalUsd = qty * price;
           const rowTotalEur = convertToEur(rowTotalUsd, "USD", rates);
-          const assetName = ASSET_NAMES[item.label] || item.label;
+          const assetName = getCoinName(item.label);
           const hasLivePrice = price > 0;
 
           return (
@@ -236,13 +333,11 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
               key={item.id}
               className="grid grid-cols-12 gap-2 items-center rounded-lg px-1 py-2 hover:bg-accent/30 transition-colors"
             >
-              {/* Asset name */}
               <div className="col-span-3">
                 <p className="text-sm font-medium">{assetName}</p>
                 <p className="text-[10px] text-muted-foreground">{item.label}</p>
               </div>
 
-              {/* Quantity input */}
               <div className="col-span-2">
                 <Input
                   type="text"
@@ -255,7 +350,6 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
                 />
               </div>
 
-              {/* Live price */}
               <div className="col-span-2 text-right">
                 {pricesLoading ? (
                   <Skeleton className="h-4 w-16 ml-auto" />
@@ -268,7 +362,6 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
                 )}
               </div>
 
-              {/* Total USD */}
               <div className="col-span-2 text-right font-mono text-sm">
                 {qty > 0 && hasLivePrice ? (
                   `$${rowTotalUsd.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
@@ -277,12 +370,10 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
                 )}
               </div>
 
-              {/* Total EUR */}
               <div className="col-span-2 text-right font-mono text-sm text-muted-foreground">
                 {qty > 0 && hasLivePrice ? formatEur(rowTotalEur) : "—"}
               </div>
 
-              {/* Delete */}
               <div className="col-span-1 text-right">
                 <Button
                   variant="ghost"
@@ -299,23 +390,73 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
           );
         })}
 
-        {/* Add custom asset */}
+        {/* Add asset with CoinGecko search */}
         <div className="pt-3 border-t border-[rgba(99,102,241,0.1)]">
           {showAddCustom ? (
-            <div className="flex gap-2">
-              <Input
-                value={customLabel}
-                onChange={(e) => setCustomLabel(e.target.value)}
-                placeholder="Ticker (ex: SOL, DOGE...)"
-                className="text-sm"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleAddCustom();
-                  if (e.key === "Escape") setShowAddCustom(false);
-                }}
-                autoFocus
-              />
-              <Button size="sm" onClick={handleAddCustom}>Ajouter</Button>
-              <Button size="sm" variant="ghost" onClick={() => setShowAddCustom(false)}>Annuler</Button>
+            <div className="relative" ref={dropdownRef}>
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <Input
+                    value={searchQuery}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    onKeyDown={handleSearchKeyDown}
+                    placeholder="Rechercher un actif (BNB, SOL, DOGE...)"
+                    className="text-sm"
+                    autoFocus
+                  />
+                  {searching && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => {
+                  setShowAddCustom(false);
+                  setSearchQuery("");
+                  setSearchResults([]);
+                }}>
+                  Annuler
+                </Button>
+              </div>
+
+              {/* Search results dropdown */}
+              {searchQuery.length >= 2 && (
+                <div className="absolute z-50 left-0 right-12 mt-1 rounded-lg border border-[rgba(99,102,241,0.2)] bg-[var(--bg-card)] shadow-xl overflow-hidden">
+                  {searching ? (
+                    <div className="px-4 py-3 text-xs text-muted-foreground">Recherche...</div>
+                  ) : searchResults.length === 0 ? (
+                    <div className="px-4 py-3 text-xs text-muted-foreground">Aucun résultat</div>
+                  ) : (
+                    searchResults.map((coin, idx) => (
+                      <button
+                        key={coin.id}
+                        onClick={() => handleSelectCoin(coin)}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
+                          idx === selectedIdx
+                            ? "bg-primary/10 text-primary"
+                            : "hover:bg-accent/50"
+                        }`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {coin.thumb && (
+                          <img
+                            src={coin.thumb}
+                            alt={coin.symbol}
+                            className="h-6 w-6 rounded-full"
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium">{coin.name}</span>
+                          <span className="text-muted-foreground ml-1.5">— {coin.symbol}</span>
+                        </div>
+                        {coin.market_cap_rank && (
+                          <span className="text-[10px] text-muted-foreground">#{coin.market_cap_rank}</span>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <Button

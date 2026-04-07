@@ -125,7 +125,7 @@ export function ObjectivesSection({ totalPatrimoine, loading: dataLoading }: Obj
             </div>
             <div>
               <Label className="text-[11px]">Montant cible (€)</Label>
-              <Input type="number" value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} placeholder="1000000" className="mt-1 h-8 text-sm font-mono" />
+              <Input type="text" inputMode="decimal" value={targetAmount} onChange={(e) => setTargetAmount(e.target.value.replace(",", "."))} placeholder="1000000" className="mt-1 h-8 text-sm font-mono" />
             </div>
             <div>
               <Label className="text-[11px]">Date cible</Label>
