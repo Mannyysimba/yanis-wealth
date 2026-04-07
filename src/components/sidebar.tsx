@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./theme-toggle";
 import { formatCurrency, formatEur } from "@/lib/format";
 import { convertToEur } from "@/lib/currency";
+import { isCryptoTab, getCryptoTabUsdTotal } from "@/lib/crypto";
 import { useWealth } from "@/contexts/wealth-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { LineItem } from "@/types";
@@ -24,7 +25,7 @@ function getTabTotal(tabId: string, lineItems: LineItem[]): number {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { tabs, lineItems, rates, loading } = useWealth();
+  const { tabs, lineItems, rates, cryptoPrices, loading } = useWealth();
 
   const capitalTabs = tabs.filter((t) => t.section === "capital");
   const investTabs = tabs.filter((t) => t.section === "investissement");
@@ -90,6 +91,10 @@ export function Sidebar() {
                   const hasChildren = tab.children && tab.children.length > 0;
                   if (hasChildren) {
                     const parentTotalEur = tab.children!.reduce((sum, child) => {
+                      if (isCryptoTab(child, tabs)) {
+                        const usdTotal = getCryptoTabUsdTotal(child.id, lineItems, cryptoPrices);
+                        return sum + convertToEur(usdTotal, "USD", rates);
+                      }
                       const childTotal = getTabTotal(child.id, lineItems);
                       return sum + convertToEur(childTotal, child.currency, rates);
                     }, 0);
@@ -107,7 +112,11 @@ export function Sidebar() {
                           )}
                         </div>
                         {tab.children!.map((child) => {
-                          const childTotal = getTabTotal(child.id, lineItems);
+                          const crypto = isCryptoTab(child, tabs);
+                          const displayTotal = crypto
+                            ? getCryptoTabUsdTotal(child.id, lineItems, cryptoPrices)
+                            : getTabTotal(child.id, lineItems);
+                          const displayCurrency = crypto ? "USD" : child.currency;
                           return (
                             <Link
                               key={child.id}
@@ -120,9 +129,9 @@ export function Sidebar() {
                               )}
                             >
                               <span>{child.name}</span>
-                              {childTotal > 0 && (
+                              {displayTotal > 0 && (
                                 <span className="text-[10px] font-mono text-muted-foreground/70 tabular-nums">
-                                  {formatCurrency(childTotal, child.currency)}
+                                  {formatCurrency(displayTotal, displayCurrency)}
                                 </span>
                               )}
                             </Link>

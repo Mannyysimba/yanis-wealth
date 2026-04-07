@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { convertToEur } from "@/lib/currency";
+import { isCryptoTab, getCryptoTabUsdTotal } from "@/lib/crypto";
 import { formatEurShort } from "@/lib/format";
 import { useWealth } from "@/contexts/wealth-context";
 import type { Tab, LineItem } from "@/types";
@@ -12,17 +13,23 @@ function getSectionTotal(
   section: string,
   tabs: Tab[],
   lineItems: LineItem[],
-  rates: Record<string, number>
+  rates: Record<string, number>,
+  cryptoPrices: Record<string, number>
 ): number {
   const sectionTabs = tabs.filter((t) => t.section === section);
   let total = 0;
   for (const tab of sectionTabs) {
     const children = tab.children && tab.children.length > 0 ? tab.children : [tab];
     for (const child of children) {
-      const rawSum = lineItems
-        .filter((li) => li.tab_id === child.id)
-        .reduce((s, li) => s + Number(li.amount), 0);
-      total += convertToEur(rawSum, child.currency, rates);
+      if (isCryptoTab(child, tabs)) {
+        const usdTotal = getCryptoTabUsdTotal(child.id, lineItems, cryptoPrices);
+        total += convertToEur(usdTotal, "USD", rates);
+      } else {
+        const rawSum = lineItems
+          .filter((li) => li.tab_id === child.id)
+          .reduce((s, li) => s + Number(li.amount), 0);
+        total += convertToEur(rawSum, child.currency, rates);
+      }
     }
   }
   return total;
@@ -30,10 +37,10 @@ function getSectionTotal(
 
 export function MobileNav() {
   const pathname = usePathname();
-  const { tabs, lineItems, rates } = useWealth();
+  const { tabs, lineItems, rates, cryptoPrices } = useWealth();
 
-  const capitalTotal = tabs.length > 0 ? getSectionTotal("capital", tabs, lineItems, rates) : 0;
-  const investTotal = tabs.length > 0 ? getSectionTotal("investissement", tabs, lineItems, rates) : 0;
+  const capitalTotal = tabs.length > 0 ? getSectionTotal("capital", tabs, lineItems, rates, cryptoPrices) : 0;
+  const investTotal = tabs.length > 0 ? getSectionTotal("investissement", tabs, lineItems, rates, cryptoPrices) : 0;
 
   const navItems = [
     {
@@ -82,7 +89,7 @@ export function MobileNav() {
       amount: null,
       icon: (
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.11 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
       ),

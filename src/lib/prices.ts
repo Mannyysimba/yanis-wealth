@@ -115,3 +115,18 @@ export function getPriceForSymbol(prices: AssetPrice[], symbol: string): number 
   const found = prices.find((p) => p.symbol === symbol);
   return found?.price_usd || 0;
 }
+
+export function getStoredCoinIds(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem("yw-coin-ids") || "{}");
+  } catch {
+    return {};
+  }
+}
+
+export function getCoinId(symbol: string): string | undefined {
+  const known = KNOWN_COINS[symbol];
+  if (known) return known.id;
+  return getStoredCoinIds()[symbol];
+}

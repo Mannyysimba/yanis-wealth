@@ -2,12 +2,13 @@
 
 import { useWealth } from "@/contexts/wealth-context";
 import { convertToEur } from "@/lib/currency";
+import { isCryptoTab, getCryptoTabUsdTotal } from "@/lib/crypto";
 import { formatCurrency, formatEur, timeAgo } from "@/lib/format";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 
 export default function InvestissementPage() {
-  const { tabs, lineItems, rates, loading, refreshTotals } = useWealth();
+  const { tabs, lineItems, rates, cryptoPrices, loading, refreshTotals } = useWealth();
   const investTabs = tabs.filter((t) => t.section === "investissement");
 
   const flatTabs = investTabs.flatMap((tab) =>
@@ -43,9 +44,24 @@ export default function InvestissementPage() {
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         {flatTabs.map((item) => {
+          const crypto = isCryptoTab(item, tabs);
           const tabItems = lineItems.filter((li) => li.tab_id === item.id);
-          const rawTotal = tabItems.reduce((s, li) => s + Number(li.amount), 0);
-          const eurTotal = convertToEur(rawTotal, item.currency, rates);
+
+          let displayTotal: number;
+          let displayCurrency: string;
+          let eurTotal: number;
+
+          if (crypto) {
+            const usdTotal = getCryptoTabUsdTotal(item.id, lineItems, cryptoPrices);
+            displayTotal = usdTotal;
+            displayCurrency = "USD";
+            eurTotal = convertToEur(usdTotal, "USD", rates);
+          } else {
+            displayTotal = tabItems.reduce((s, li) => s + Number(li.amount), 0);
+            displayCurrency = item.currency;
+            eurTotal = convertToEur(displayTotal, item.currency, rates);
+          }
+
           const lastUpdated = tabItems.length > 0
             ? tabItems.reduce((a, b) => new Date(a.updated_at) > new Date(b.updated_at) ? a : b).updated_at
             : null;
@@ -55,15 +71,15 @@ export default function InvestissementPage() {
               <div className="card-gradient-border card-hover-glow rounded-xl p-5 cursor-pointer">
                 <div className="flex items-start justify-between">
                   <h3 className="text-sm font-semibold">{item.name}</h3>
-                  <span className={`text-base font-mono font-semibold tabular-nums ${rawTotal > 0 ? "text-primary" : "text-muted-foreground"}`}>
-                    {formatCurrency(rawTotal, item.currency)}
+                  <span className={`text-base font-mono font-semibold tabular-nums ${displayTotal > 0 ? "text-primary" : "text-muted-foreground"}`}>
+                    {formatCurrency(displayTotal, displayCurrency)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between mt-2">
                   <p className="text-xs text-muted-foreground">
-                    {item.currency}{lastUpdated ? ` · ${timeAgo(lastUpdated)}` : ""}
+                    {displayCurrency}{lastUpdated ? ` · ${timeAgo(lastUpdated)}` : ""}
                   </p>
-                  {item.currency !== "EUR" && eurTotal > 0 && (
+                  {displayCurrency !== "EUR" && eurTotal > 0 && (
                     <span className="text-[11px] font-mono text-muted-foreground/70 tabular-nums">
                       {formatEur(eurTotal)}
                     </span>

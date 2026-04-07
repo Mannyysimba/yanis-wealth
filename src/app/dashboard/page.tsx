@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useWealth } from "@/contexts/wealth-context";
 import { convertToEur } from "@/lib/currency";
+import { isCryptoTab, getCryptoTabUsdTotal } from "@/lib/crypto";
 import { formatEur, formatPercent, safeDate } from "@/lib/format";
 import { SummaryCards } from "@/components/summary-cards";
 import { WealthChart } from "@/components/wealth-chart";
@@ -18,7 +19,7 @@ function todayISO() {
 }
 
 export default function DashboardPage() {
-  const { tabs, lineItems, rates, ratesLastUpdated: lastUpdated, loading: wealthLoading } = useWealth();
+  const { tabs, lineItems, rates, cryptoPrices, ratesLastUpdated: lastUpdated, loading: wealthLoading } = useWealth();
   const [snapshots, setSnapshots] = useState<DailySnapshot[]>([]);
   const [snapshotsLoading, setSnapshotsLoading] = useState(true);
   const [activeMilestone, setActiveMilestone] = useState<{ amount: number; label: string; emoji: string; message: string } | null>(null);
@@ -46,7 +47,7 @@ export default function DashboardPage() {
     let investTotal = 0;
     const currencyAmounts: Record<string, number> = { EUR: 0, MAD: 0, AED: 0, USD: 0 };
     const categoryTotals: Record<string, number> = {
-      Espèces: 0,
+      "Espèces": 0,
       Banque: 0,
       Crypto: 0,
       Immobilier: 0,
@@ -55,13 +56,21 @@ export default function DashboardPage() {
 
     for (const tab of allTabs) {
       const tabItems = lineItems.filter((li) => li.tab_id === tab.id);
-      const rawSum = tabItems.reduce((s, li) => s + Number(li.amount), 0);
+      const isCrypto = isCryptoTab(tab, tabs);
 
-      if (tab.currency in currencyAmounts) {
-        currencyAmounts[tab.currency] += rawSum;
+      let eurValue: number;
+      if (isCrypto) {
+        const usdTotal = getCryptoTabUsdTotal(tab.id, lineItems, cryptoPrices);
+        currencyAmounts["USD"] += usdTotal;
+        eurValue = convertToEur(usdTotal, "USD", rates);
+      } else {
+        const rawSum = tabItems.reduce((s, li) => s + Number(li.amount), 0);
+        if (tab.currency in currencyAmounts) {
+          currencyAmounts[tab.currency] += rawSum;
+        }
+        eurValue = convertToEur(rawSum, tab.currency, rates);
       }
 
-      const eurValue = convertToEur(rawSum, tab.currency, rates);
       breakdown[tab.name] = eurValue;
       const parent = tabs.find((p) => p.id === tab.parent_id || p.id === tab.id);
       const parentName = parent?.name || tab.name;
@@ -121,7 +130,7 @@ export default function DashboardPage() {
       currencyRows,
       breakdown,
     };
-  }, [tabs, lineItems, rates, snapshots]);
+  }, [tabs, lineItems, rates, cryptoPrices, snapshots]);
 
   // Check for milestone celebrations
   useEffect(() => {
