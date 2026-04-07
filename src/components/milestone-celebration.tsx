@@ -11,9 +11,7 @@ interface Milestone {
 }
 
 const MILESTONES: Milestone[] = [
-  { amount: 10_000, label: "10K€", emoji: "👊", message: "10K€ dans la poche Patron 👊 Le voyage commence." },
-  { amount: 25_000, label: "25K€", emoji: "💰", message: "25K€ Yanis. Un quart de siècle en euros, pas mal Chef." },
-  { amount: 50_000, label: "50K€", emoji: "🔥", message: "50K€ 🔥 La moitié du chemin vers les 6 chiffres Patron." },
+  { amount: 75_000, label: "75K€", emoji: "🔥", message: "75K€ Yanis. Trois quarts du chemin vers les 6 chiffres Patron. 🔥" },
   { amount: 100_000, label: "100K€", emoji: "💎", message: "6 chiffres Yanis. WOW. +100K€ nan là c'est fort — mais on va aller plus loin. 💎" },
   { amount: 250_000, label: "250K€", emoji: "🚀", message: "250K€ Patron. T'es plus dans la moyenne là. Bienvenue dans une autre catégorie. 🚀" },
   { amount: 500_000, label: "500K€", emoji: "👑", message: "Demi-million Yanis. 500 000€. Le patrimoine d'un homme sérieux. 👑" },
@@ -23,7 +21,10 @@ const MILESTONES: Milestone[] = [
 function getCrossedMilestones(): Set<number> {
   if (typeof window === "undefined") return new Set();
   try {
-    return new Set(JSON.parse(localStorage.getItem("yw-milestones") || "[]"));
+    const stored: number[] = JSON.parse(localStorage.getItem("yw-milestones") || "[]");
+    // Clean out removed milestones that no longer exist
+    const validAmounts = new Set(MILESTONES.map((m) => m.amount));
+    return new Set(stored.filter((a) => validAmounts.has(a)));
   } catch {
     return new Set();
   }
