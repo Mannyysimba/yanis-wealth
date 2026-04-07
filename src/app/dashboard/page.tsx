@@ -176,7 +176,6 @@ export default function DashboardPage() {
 
       <ObjectivesSection
         totalPatrimoine={calculations.totalPatrimoine}
-        snapshots={snapshots}
         loading={loading}
       />
     </div>

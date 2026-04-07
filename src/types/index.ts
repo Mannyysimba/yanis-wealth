@@ -40,9 +40,14 @@ export interface ExchangeRates {
 
 export interface Objective {
   id: string;
+  tab_id: string | null;
   title: string;
-  target_amount_eur: number;
+  target_amount: number;
+  target_currency: string;
+  target_amount_eur: number | null;
   target_date: string;
+  is_completed: boolean;
+  completed_at: string | null;
   created_at: string;
 }
 
@@ -50,4 +55,17 @@ export interface BreakdownItem {
   name: string;
   value: number;
   color: string;
+}
+
+export interface ObjectiveWithContext extends Objective {
+  tab_name: string;
+  tab_section: string;
+  current_amount: number;
+  current_amount_eur: number;
+  progress: number;
+  remaining: number;
+  remaining_eur: number;
+  days_left: number;
+  velocity_daily_eur: number;
+  projected_date: Date | null;
 }

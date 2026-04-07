@@ -44,12 +44,17 @@ CREATE TABLE daily_snapshots (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Objectives / Goals
+-- Objectives / Goals (per-tab or global)
 CREATE TABLE objectives (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tab_id UUID REFERENCES tabs(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
-  target_amount_eur DECIMAL(20,2) NOT NULL,
+  target_amount DECIMAL(20,2) NOT NULL DEFAULT 0,
+  target_currency TEXT NOT NULL DEFAULT 'EUR',
+  target_amount_eur DECIMAL(20,2),
   target_date DATE NOT NULL,
+  is_completed BOOLEAN DEFAULT FALSE,
+  completed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

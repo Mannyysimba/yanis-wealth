@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CURRENCY_SYMBOLS } from "@/lib/constants";
 import { timeAgo } from "@/lib/format";
+import { TabObjective } from "@/components/tab-objective";
 import type { LineItem, Tab } from "@/types";
 
 interface LineItemFormProps {
@@ -116,6 +117,7 @@ export function LineItemForm({ tab }: LineItemFormProps) {
   };
 
   const symbol = CURRENCY_SYMBOLS[tab.currency] || tab.currency;
+  const currentTotal = items.reduce((sum, item) => sum + Number(item.amount), 0);
 
   return (
     <div className="card-gradient-border rounded-xl">
@@ -223,6 +225,8 @@ export function LineItemForm({ tab }: LineItemFormProps) {
             <Button onClick={handleSaveAll} disabled={saving} className="w-full">
               {saving ? "Enregistrement..." : "Sauvegarder"}
             </Button>
+
+            <TabObjective tab={tab} currentTotal={currentTotal} />
           </>
         )}
       </div>
