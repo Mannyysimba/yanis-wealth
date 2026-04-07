@@ -15,8 +15,8 @@ export const FALLBACK_RATES: Record<string, number> = {
 
 export const CURRENCY_SYMBOLS: Record<string, string> = {
   EUR: '€',
-  MAD: 'د.م.',
-  AED: 'د.إ',
+  MAD: 'MAD',
+  AED: 'AED',
   USD: '$',
 };
 
