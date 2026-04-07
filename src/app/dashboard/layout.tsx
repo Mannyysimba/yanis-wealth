@@ -66,7 +66,7 @@ export default function DashboardLayout({
             {children}
           </div>
         </main>
-        <MobileNav />
+        <MobileNav tabs={tabs} lineItems={lineItems} rates={rates} />
       </div>
     </>
   );

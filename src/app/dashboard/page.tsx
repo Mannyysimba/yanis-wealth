@@ -11,6 +11,7 @@ import { WealthChart } from "@/components/wealth-chart";
 import { AllocationChart } from "@/components/allocation-chart";
 import { CurrencyTable } from "@/components/currency-table";
 import { ObjectivesSection } from "@/components/objectives-section";
+import { MilestoneCelebration, NextMilestoneBar, checkForNewMilestone } from "@/components/milestone-celebration";
 import type { LineItem, DailySnapshot, BreakdownItem } from "@/types";
 
 function todayISO() {
@@ -23,6 +24,7 @@ export default function DashboardPage() {
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [snapshots, setSnapshots] = useState<DailySnapshot[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
+  const [activeMilestone, setActiveMilestone] = useState<{ amount: number; label: string; emoji: string; message: string } | null>(null);
   const upsertTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -149,6 +151,13 @@ export default function DashboardPage() {
     };
   }, [tabs, lineItems, rates, snapshots]);
 
+  // Check for milestone celebrations
+  useEffect(() => {
+    if (loading || calculations.totalPatrimoine <= 0) return;
+    const milestone = checkForNewMilestone(calculations.totalPatrimoine);
+    if (milestone) setActiveMilestone(milestone);
+  }, [loading, calculations.totalPatrimoine]);
+
   // Auto-upsert today's snapshot whenever totalPatrimoine changes (debounced 2s)
   useEffect(() => {
     if (loading || calculations.totalPatrimoine === 0) return;
@@ -216,6 +225,14 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      {/* Milestone celebration */}
+      {activeMilestone && (
+        <MilestoneCelebration
+          milestone={activeMilestone}
+          onDone={() => setActiveMilestone(null)}
+        />
+      )}
+
       {/* Hero Section */}
       <div className="title-gradient rounded-2xl p-6 -mx-2 animate-fade-in">
         <p className="text-sm text-muted-foreground capitalize">{today}</p>
@@ -241,6 +258,7 @@ export default function DashboardPage() {
             {lastUpdated && <span className="ml-2 text-muted-foreground/60">· {lastUpdated}</span>}
           </p>
         )}
+        {!loading && <NextMilestoneBar totalEur={calculations.totalPatrimoine} />}
       </div>
 
       <SummaryCards

@@ -15,8 +15,18 @@ interface LineItemFormProps {
   tab: Tab;
 }
 
+function parseNum(value: string): number {
+  return parseFloat(value.replace(",", ".")) || 0;
+}
+
+function formatDisplay(amount: number): string {
+  if (amount === 0) return "";
+  return amount.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
 export function LineItemForm({ tab }: LineItemFormProps) {
   const [items, setItems] = useState<LineItem[]>([]);
+  const [rawInputs, setRawInputs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [newLabel, setNewLabel] = useState("");
@@ -33,6 +43,12 @@ export function LineItemForm({ tab }: LineItemFormProps) {
 
     if (!error && data) {
       setItems(data);
+      // Initialize display values
+      const inputs: Record<string, string> = {};
+      for (const item of data) {
+        inputs[item.id] = formatDisplay(Number(item.amount));
+      }
+      setRawInputs(inputs);
       if (data.length > 0) {
         const latest = data.reduce((a, b) =>
           new Date(a.updated_at) > new Date(b.updated_at) ? a : b
@@ -48,19 +64,25 @@ export function LineItemForm({ tab }: LineItemFormProps) {
   }, [fetchItems]);
 
   const handleAmountChange = (id: string, value: string) => {
-    const num = parseFloat(value.replace(/[^\d.,\-]/g, "").replace(",", ".")) || 0;
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, amount: num } : item))
-    );
+    // Allow only digits, comma, dot, minus
+    const cleaned = value.replace(/[^\d.,\-]/g, "");
+    setRawInputs((prev) => ({ ...prev, [id]: cleaned }));
   };
 
   const handleBlurSave = async (id: string) => {
-    const item = items.find((i) => i.id === id);
-    if (!item) return;
+    const raw = rawInputs[id] || "";
+    const num = parseNum(raw);
+    // Update item amount
+    setItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, amount: num } : item))
+    );
+    // Format display
+    setRawInputs((prev) => ({ ...prev, [id]: formatDisplay(num) }));
+    // Save to DB
     const now = new Date().toISOString();
     await supabase
       .from("line_items")
-      .update({ amount: item.amount, updated_at: now })
+      .update({ amount: num, updated_at: now })
       .eq("id", id);
     setLastModified(now);
   };
@@ -69,13 +91,16 @@ export function LineItemForm({ tab }: LineItemFormProps) {
     setSaving(true);
     const now = new Date().toISOString();
     for (const item of items) {
+      const raw = rawInputs[item.id] || "";
+      const num = parseNum(raw);
       await supabase
         .from("line_items")
-        .update({ amount: item.amount, updated_at: now })
+        .update({ amount: num, updated_at: now })
         .eq("id", item.id);
     }
     setLastModified(now);
     setSaving(false);
+    fetchItems();
   };
 
   const handleAdd = async () => {
@@ -95,6 +120,7 @@ export function LineItemForm({ tab }: LineItemFormProps) {
 
     if (!error && data) {
       setItems((prev) => [...prev, data]);
+      setRawInputs((prev) => ({ ...prev, [data.id]: "" }));
       setNewLabel("");
     }
   };
@@ -102,6 +128,11 @@ export function LineItemForm({ tab }: LineItemFormProps) {
   const handleDelete = async (id: string) => {
     await supabase.from("line_items").delete().eq("id", id);
     setItems((prev) => prev.filter((item) => item.id !== id));
+    setRawInputs((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   };
 
   const handleRename = async (id: string) => {
@@ -183,7 +214,7 @@ export function LineItemForm({ tab }: LineItemFormProps) {
                     <Input
                       type="text"
                       inputMode="decimal"
-                      value={item.amount === 0 ? "" : item.amount.toString()}
+                      value={rawInputs[item.id] ?? ""}
                       onChange={(e) => handleAmountChange(item.id, e.target.value)}
                       onBlur={() => handleBlurSave(item.id)}
                       placeholder="0,00"

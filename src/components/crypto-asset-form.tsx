@@ -65,6 +65,7 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
   const [searchResults, setSearchResults] = useState<CoinSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(-1);
+  const [rawInputs, setRawInputs] = useState<Record<string, string>>({});
   const [lastModified, setLastModified] = useState<string | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -78,6 +79,12 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
 
     if (data) {
       setItems(data);
+      const inputs: Record<string, string> = {};
+      for (const item of data) {
+        const amt = Number(item.amount);
+        inputs[item.id] = amt === 0 ? "" : amt.toString();
+      }
+      setRawInputs(inputs);
       if (data.length > 0) {
         const latest = data.reduce((a, b) =>
           new Date(a.updated_at) > new Date(b.updated_at) ? a : b
@@ -239,19 +246,21 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
   };
 
   const handleQuantityChange = (id: string, value: string) => {
-    const num = parseFloat(value.replace(/[^\d.,\-]/g, "").replace(",", ".")) || 0;
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, amount: num } : item))
-    );
+    const cleaned = value.replace(/[^\d.,\-]/g, "");
+    setRawInputs((prev) => ({ ...prev, [id]: cleaned }));
   };
 
   const handleBlurSave = async (id: string) => {
-    const item = items.find((i) => i.id === id);
-    if (!item) return;
+    const raw = rawInputs[id] || "";
+    const num = parseFloat(raw.replace(",", ".")) || 0;
+    setItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, amount: num } : item))
+    );
+    setRawInputs((prev) => ({ ...prev, [id]: num === 0 ? "" : num.toString() }));
     const now = new Date().toISOString();
     await supabase
       .from("line_items")
-      .update({ amount: item.amount, updated_at: now })
+      .update({ amount: num, updated_at: now })
       .eq("id", id);
     setLastModified(now);
   };
@@ -342,7 +351,7 @@ export function CryptoAssetForm({ tab }: CryptoAssetFormProps) {
                 <Input
                   type="text"
                   inputMode="decimal"
-                  value={item.amount === 0 ? "" : item.amount.toString()}
+                  value={rawInputs[item.id] ?? ""}
                   onChange={(e) => handleQuantityChange(item.id, e.target.value)}
                   onBlur={() => handleBlurSave(item.id)}
                   placeholder="0"
