@@ -141,7 +141,11 @@ export function Sidebar() {
                     );
                   }
 
-                  const tabTotal = getTabTotal(tab.id, lineItems);
+                  const crypto = isCryptoTab(tab, tabs);
+                  const tabTotal = crypto
+                    ? getCryptoTabUsdTotal(tab.id, lineItems, cryptoPrices)
+                    : getTabTotal(tab.id, lineItems);
+                  const tabCurrency = crypto ? "USD" : tab.currency;
                   return (
                     <Link
                       key={tab.id}
@@ -156,7 +160,7 @@ export function Sidebar() {
                       <span>{tab.name}</span>
                       {tabTotal > 0 && (
                         <span className="text-[10px] font-mono text-muted-foreground/70 tabular-nums">
-                          {formatCurrency(tabTotal, tab.currency)}
+                          {formatCurrency(tabTotal, tabCurrency)}
                         </span>
                       )}
                     </Link>
