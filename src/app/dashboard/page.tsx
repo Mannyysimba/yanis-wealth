@@ -8,6 +8,7 @@ import { isCryptoTab, getCryptoTabUsdTotal } from "@/lib/crypto";
 import { formatEur, formatPercent, safeDate } from "@/lib/format";
 import { SummaryCards } from "@/components/summary-cards";
 import { WealthChart } from "@/components/wealth-chart";
+import { ManualWealthChart } from "@/components/manual-wealth-chart";
 import { AllocationChart } from "@/components/allocation-chart";
 import { CurrencyTable } from "@/components/currency-table";
 import { ObjectivesSection } from "@/components/objectives-section";
@@ -241,6 +242,8 @@ export default function DashboardPage() {
       />
 
       <WealthChart chartData={chartData} loading={loading} />
+
+      <ManualWealthChart />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <AllocationChart
